@@ -1,13 +1,18 @@
 // lib/file_manager_locator.dart
 
 import 'file_manager_interface.dart';
-// 1. Importación "stub" (ficticia) que será reemplazada
-import 'file_manager_mobile.dart'
-// 2. Condición: Si el compilador sabe qué es 'dart:html', usa 'file_manager_web.dart'
-if (dart.library.html) 'file_manager_web.dart'
-// 3. Condición: Si el compilador sabe qué es 'dart:io', usa 'file_manager_mobile.dart'
-if (dart.library.io) 'file_manager_mobile.dart';
 
-// Esta función es la que usará nuestra app.
-// Devuelve la implementación correcta según la plataforma.
+// --- CAMBIO CLAVE ---
+// 1. Comentamos (o borramos) todas las importaciones condicionales antiguas
+// import 'file_manager_mobile.dart'
+//     if (dart.library.html) 'file_manager_web.dart'
+//     if (dart.library.io) 'file_manager_mobile.dart';
+
+// 2. Importamos DIRECTAMENTE nuestra nueva implementación de Firebase
+import 'file_manager_firebase.dart';
+// --- FIN DEL CAMBIO ---
+
+
+// Esta función es la que usa nuestra app.
+// Ahora siempre devolverá la versión de Firebase.
 FileManagerInterface getFileManager() => FileManager();

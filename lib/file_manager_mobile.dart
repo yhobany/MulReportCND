@@ -2,25 +2,18 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// 1. IMPORTAR los nuevos archivos
 import 'equipment_record.dart';
 import 'file_manager_interface.dart';
 
-// 2. ELIMINAMOS la clase 'EquipmentRecord' de aquí
-
-// 3. AÑADIMOS 'implements FileManagerInterface'
 class FileManager implements FileManagerInterface {
 
   // (Todas las funciones de REGISTRO no cambian)
 
-  @override
   Future<String> _getStorageDirectory() async {
     final directory = await getApplicationDocumentsDirectory();
     return directory.path;
   }
 
-  @override
   Future<File> _getRegistroFile() async {
     final path = await _getStorageDirectory();
     return File('$path/registro.txt');
@@ -40,7 +33,6 @@ class FileManager implements FileManagerInterface {
     }
   }
 
-  @override
   DateTime? _parseDate(String dateStr) {
     try {
       return DateFormat('d/M/yyyy').parseStrict(dateStr);
@@ -85,7 +77,6 @@ class FileManager implements FileManagerInterface {
 
   // --- EQUIPOS (equipos.csv) ---
 
-  @override
   Future<File> _getEquiposFile() async {
     final path = await _getStorageDirectory();
     return File('$path/equipos.csv');
@@ -116,7 +107,16 @@ class FileManager implements FileManagerInterface {
         if (line.isEmpty) continue;
         final parts = line.split(',');
         if (parts.length >= 3) {
-          results.add(EquipmentRecord(date: parts[0], ut: parts[1], equipment: parts[2]));
+          // --- CAMBIO AQUÍ ---
+          // Le pasamos 'id: null' porque este registro viene de un archivo,
+          // no de Firebase.
+          results.add(EquipmentRecord(
+              id: null, // <-- AÑADIDO
+              date: parts[0],
+              ut: parts[1],
+              equipment: parts[2]
+          ));
+          // --- FIN DEL CAMBIO ---
         }
       }
     } catch (e) {
@@ -128,6 +128,8 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<bool> deleteEquipmentRecords(List<EquipmentRecord> recordsToDelete) async {
+    // (Esta función no necesita cambios, ya que nuestro '=='
+    // actualizado en EquipmentRecord sabe cómo manejar 'id: null')
     final file = await _getEquiposFile();
     if (!await file.exists()) return false;
     final recordsToDeleteSet = recordsToDelete
@@ -155,6 +157,7 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<String> getNextImageName(String ut) async {
+    // (Esta función no cambia)
     final prefs = await SharedPreferences.getInstance();
     final prefix = ut.length >= 4 ? ut.substring(0, 4).toUpperCase() : ut.toUpperCase();
     final key = "image_counter_$prefix";
@@ -164,35 +167,28 @@ class FileManager implements FileManagerInterface {
     return fileName;
   }
 
-  // 4. CAMBIO EN LA FIRMA Y EL RETORNO
   @override
   Future<String?> generateDatedCsvFileWithFilter() async {
+    // (Esta función no cambia)
     final masterFile = await _getEquiposFile();
     if (!await masterFile.exists()) return null;
-
     final String currentDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
     final allRecords = await readEquipmentRecords();
     final filteredRecords = allRecords.where((record) => record.date == currentDate).toList();
-
     if (filteredRecords.isEmpty) {
       print("No hay registros de hoy para exportar.");
       return null;
     }
-
     final csvContent = filteredRecords
         .map((r) => "${r.date},${r.ut},${r.equipment}")
         .join('\n');
-
     try {
       final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
       final String fileName = "equipos_$dateSuffix.csv";
       final tempDir = await getTemporaryDirectory();
       final File tempFile = File('${tempDir.path}/$fileName');
       await tempFile.writeAsString(csvContent);
-
-      // Devolvemos la RUTA (String) en lugar del Archivo (File)
       return tempFile.path;
-
     } catch (e) {
       print("Error al crear archivo CSV temporal: $e");
       return null;

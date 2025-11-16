@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-// 1. IMPORTA las tres pantallas
+// --- 1. IMPORTA EL ARCHIVO GENERADO ---
+import 'firebase_options.dart';
+
+// (Importaciones de las pantallas)
 import 'register_screen.dart';
 import 'report_screen.dart';
-import 'equipos_screen.dart'; // <-- NUEVA IMPORTACIÓN
+import 'equipos_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // --- 2. USA LAS OPCIONES DEL ARCHIVO ---
+  // Le decimos a Firebase que se inicialice usando las "llaves"
+  // que 'flutterfire configure' acaba de crear.
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const MyApp());
 }
 
@@ -45,16 +58,10 @@ class MainScreen extends StatelessWidget {
           ],
         ),
       ),
-      // --- CAMBIO AQUÍ: 'const' ELIMINADO ---
       body: TabBarView(
         children: [
-          // Pantalla 1
           RegisterScreen(),
-
-          // Pantalla 2
           ReportScreen(),
-
-          // Pantalla 3
           EquiposScreen(),
         ],
       ),
