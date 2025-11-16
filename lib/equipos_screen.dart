@@ -1,9 +1,16 @@
+// --- IMPORTACIONES (sin cambios) ---
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'file_manager.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
-import 'dart:io'; // <-- ¡LA LÍNEA QUE FALTABA!
+import 'package:intl/intl.dart';
+import 'file_manager_locator.dart';
+import 'file_manager_interface.dart';
+import 'equipment_record.dart';
+import 'html_stub.dart' if (dart.library.html) 'dart:html' as html_stub;
 
 class EquiposScreen extends StatefulWidget {
   const EquiposScreen({super.key});
@@ -13,25 +20,20 @@ class EquiposScreen extends StatefulWidget {
 }
 
 class _EquiposScreenState extends State<EquiposScreen> {
-  final FileManager fileManager = FileManager();
-
+  // (Propiedades de la clase sin cambios)
+  final FileManagerInterface fileManager = getFileManager();
   final TextEditingController _utController = TextEditingController();
   final TextEditingController _equipoPrincipalController = TextEditingController();
-
   List<TextEditingController> _additionalEquipControllers = [];
-
   List<EquipmentRecord> _savedRecords = [];
   bool _isCollapsed = false;
   Set<EquipmentRecord> _selectedRecords = {};
-
   final String _currentDate =
       "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
-
   final List<String> validPrefixes = [
     "PFM6", "PFM4", "PCM1", "PCM3", "PP30", "PP40",
     "PP50", "PP90", "PP95", "PP20", "PR"
   ];
-
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -40,6 +42,8 @@ class _EquiposScreenState extends State<EquiposScreen> {
     _loadRecords();
   }
 
+  // (Funciones _loadRecords, dispose, add/remove, _handleSave no cambian)
+  // ...
   Future<void> _loadRecords() async {
     final records = await fileManager.readEquipmentRecords();
     setState(() {
@@ -70,7 +74,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
   }
 
   Future<void> _handleSave() async {
-    // ... (esta función no cambia)
     FocusScope.of(context).unfocus();
     final String ut = _utController.text;
     if (ut.isEmpty) {
@@ -113,37 +116,61 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
   }
 
+
+  // --- 📸 FUNCIÓN DE CÁMARA/GALERÍA (ACTUALIZADA) ---
   Future<void> _handleCamera(int? index) async {
-    // ... (esta función no cambia)
+    // 1. Validar UT (común para ambas plataformas)
     if (_utController.text.isEmpty) {
       _showAlertDialog('Error', 'Debe ingresar la UT antes de tomar una foto.');
       return;
     }
-    var status = await Permission.camera.request();
-    if (status.isGranted) {
+
+    XFile? photo; // Variable para guardar la foto/archivo
+
+    if (kIsWeb) {
+      // --- LÓGICA WEB (MODIFICADA) ---
+      // 'image_picker' en web usa 'ImageSource.gallery' para abrir el selector de archivos.
       try {
-        final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-        if (photo != null) {
-          final String newFileName = await fileManager.getNextImageName(_utController.text);
-          setState(() {
-            if (index == null) {
-              _equipoPrincipalController.text = newFileName;
-            } else {
-              _additionalEquipControllers[index].text = newFileName;
-            }
-          });
-        }
+        // Ya no mostramos el diálogo de error, abrimos la galería
+        photo = await _picker.pickImage(source: ImageSource.gallery);
       } catch (e) {
-        _showAlertDialog('Error de Cámara', 'No se pudo iniciar la cámara: $e');
+        _showAlertDialog('Error al seleccionar archivo', 'No se pudo cargar la imagen: $e');
       }
-    } else if (status.isDenied || status.isPermanentlyDenied) {
-      _showAlertDialog('Permiso Denegado',
-          'No se puede usar la cámara sin permisos. Vaya a la configuración de la app para habilitarlos.');
+    } else {
+      // --- LÓGICA MÓVIL (LA QUE YA TENÍAMOS) ---
+      var status = await Permission.camera.request();
+      if (status.isGranted) {
+        try {
+          photo = await _picker.pickImage(source: ImageSource.camera);
+        } catch (e) {
+          _showAlertDialog('Error de Cámara', 'No se pudo iniciar la cámara: $e');
+        }
+      } else if (status.isDenied || status.isPermanentlyDenied) {
+        _showAlertDialog('Permiso Denegado',
+            'No se puede usar la cámara sin permisos. Vaya a la configuración de la app para habilitarlos.');
+      }
+    }
+
+    // --- LÓGICA COMÚN (después de tomar la foto o seleccionarla) ---
+    if (photo != null) {
+      // Generamos un nombre, igual que en móvil
+      final String newFileName = await fileManager.getNextImageName(_utController.text);
+
+      setState(() {
+        if (index == null) {
+          _equipoPrincipalController.text = newFileName;
+        } else {
+          _additionalEquipControllers[index].text = newFileName;
+        }
+      });
+      // NOTA: No copiamos el archivo, solo guardamos el *nombre*
+      // (el archivo real no se sube a ningún lado, solo se registra).
     }
   }
+  // --- FIN DE LA FUNCIÓN ACTUALIZADA ---
 
   Future<void> _handleDelete() async {
-    // ... (esta función no cambia)
+    // (Esta función no cambia)
     if (_selectedRecords.isEmpty) {
       _showAlertDialog('Error', 'No se han seleccionado registros para eliminar.');
       return;
@@ -177,28 +204,47 @@ class _EquiposScreenState extends State<EquiposScreen> {
   }
 
   Future<void> _handleExport() async {
-    // Esta función usa 'File', por eso 'dart:io' es necesario
-    final File? file = await fileManager.generateDatedCsvFileWithFilter();
-
-    if (file != null) {
+    // (Esta función no cambia)
+    final String? contentOrPath = await fileManager.generateDatedCsvFileWithFilter();
+    if (contentOrPath == null) {
+      _showAlertDialog('No hay datos', 'No se encontraron registros con la fecha de hoy ($_currentDate) para exportar.');
+      return;
+    }
+    if (kIsWeb) {
+      try {
+        final String csvContent = contentOrPath;
+        final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
+        final String fileName = "equipos_$dateSuffix.csv";
+        final bytes = utf8.encode(csvContent);
+        final blob = html_stub.Blob([bytes], 'text/csv');
+        final url = html_stub.Url.createObjectUrlFromBlob(blob);
+        final anchor = html_stub.AnchorElement(href: url)
+          ..setAttribute("download", fileName)
+          ..click();
+        html_stub.Url.revokeObjectUrl(url);
+        _showSnackBar('Descargando archivo...');
+      } catch (e) {
+        _showAlertDialog('Error de Exportación Web', 'No se pudo descargar el archivo: $e');
+      }
+    } else {
+      final String filePath = contentOrPath;
       await Share.shareXFiles(
-        [XFile(file.path)],
+        [XFile(filePath)],
         text: 'Registros de Equipos del día $_currentDate',
         subject: 'Reporte CND - Equipos',
       );
-    } else {
-      _showAlertDialog('No hay datos', 'No se encontraron registros con la fecha de hoy ($_currentDate) para exportar.');
     }
   }
 
-  // (Funciones de ayuda para Diálogos y SnackBar)
   void _showSnackBar(String message) {
+    // (Esta función no cambia)
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
   }
 
   void _showAlertDialog(String title, String content) {
+    // (Esta función no cambia)
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -218,6 +264,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // (El build() no cambia en absoluto)
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(16.0),
@@ -382,6 +429,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                       Icon(_isCollapsed ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up),
                       Text(_isCollapsed ? 'Expandir' : 'Colapsar'),
                     ],
+
                   ),
                 ),
               ),

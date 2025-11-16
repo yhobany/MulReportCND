@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-// 1. IMPORTA el file_manager
-import 'file_manager.dart';
+// --- CAMBIOS DE IMPORTACIÓN ---
+import 'file_manager_locator.dart'; // Importamos el "selector"
+import 'file_manager_interface.dart'; // Importamos la interfaz
+// --- FIN DE CAMBIOS ---
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -10,18 +12,17 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
-  // 2. CREA UNA INSTANCIA de FileManager
-  final FileManager fileManager = FileManager();
+  // --- CAMBIO DE INICIALIZACIÓN ---
+  final FileManagerInterface fileManager = getFileManager();
+  // --- FIN DEL CAMBIO ---
 
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
   final TextEditingController _plantController = TextEditingController();
   final TextEditingController _utController = TextEditingController();
 
-  // La lista de resultados AHORA SÍ CAMBIARÁ
   List<String> _results = [];
 
-  // Lista de prefijos para el filtro de Planta
   final List<String> plantOptions = [
     "PFM6", "PFM4", "PCM1", "PCM3", "PP30", "PP40",
     "PP50", "PP90", "PP95", "PP20", "PR"
@@ -36,12 +37,12 @@ class _ReportScreenState extends State<ReportScreen> {
     super.dispose();
   }
 
-  // 3. LÓGICA DE BÚSQUEDA (AHORA COMPLETA)
+  // (El resto del archivo, _performSearch, build, etc., no cambia en absoluto)
+  // ...
+
   Future<void> _performSearch() async {
-    // Ocultar el teclado
     FocusScope.of(context).unfocus();
 
-    // Llama al fileManager con los valores de los campos
     final searchResults = await fileManager.searchInFile(
       _startDateController.text,
       _endDateController.text,
@@ -49,29 +50,25 @@ class _ReportScreenState extends State<ReportScreen> {
       _plantController.text,
     );
 
-    // Actualiza la UI con los resultados
     setState(() {
       _results = searchResults;
     });
   }
 
-  // 4. LÓGICA PARA MOSTRAR EL SELECTOR DE FECHA
   Future<void> _selectDate(
       BuildContext context, TextEditingController controller) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(), // Fecha inicial
-      firstDate: DateTime(2020), // Límite inferior
-      lastDate: DateTime(2101),  // Límite superior
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2101),
     );
 
     if (picked != null) {
-      // Formatea la fecha como DD/MM/YYYY y la pone en el campo
       controller.text = "${picked.day}/${picked.month}/${picked.year}";
     }
   }
 
-  // 5. LÓGICA PARA MOSTRAR EL SELECTOR DE PLANTA
   void _showPlantDialog() {
     showDialog(
       context: context,
@@ -82,7 +79,6 @@ class _ReportScreenState extends State<ReportScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Opción para limpiar el filtro
                 ListTile(
                   title: const Text('TODAS (limpiar filtro)'),
                   onTap: () {
@@ -90,7 +86,6 @@ class _ReportScreenState extends State<ReportScreen> {
                     Navigator.of(context).pop();
                   },
                 ),
-                // Lista de plantas
                 ...plantOptions.map((option) {
                   return ListTile(
                     title: Text(option),
@@ -115,10 +110,8 @@ class _ReportScreenState extends State<ReportScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // --- FILTROS DE BÚSQUEDA ---
             Row(
               children: [
-                // 6. CAMPO FECHA DE INICIO (MODIFICADO)
                 Expanded(
                   child: TextField(
                     controller: _startDateController,
@@ -127,12 +120,11 @@ class _ReportScreenState extends State<ReportScreen> {
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.date_range),
                     ),
-                    readOnly: true, // No se puede escribir
-                    onTap: () => _selectDate(context, _startDateController), // Llama al selector
+                    readOnly: true,
+                    onTap: () => _selectDate(context, _startDateController),
                   ),
                 ),
                 const SizedBox(width: 16),
-                // 7. CAMPO FECHA DE FIN (MODIFICADO)
                 Expanded(
                   child: TextField(
                     controller: _endDateController,
@@ -142,7 +134,7 @@ class _ReportScreenState extends State<ReportScreen> {
                       suffixIcon: Icon(Icons.date_range),
                     ),
                     readOnly: true,
-                    onTap: () => _selectDate(context, _endDateController), // Llama al selector
+                    onTap: () => _selectDate(context, _endDateController),
                   ),
                 ),
               ],
@@ -150,7 +142,6 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(height: 16),
             Row(
               children: [
-                // 8. CAMPO PLANTA (MODIFICADO)
                 Expanded(
                   child: TextField(
                     controller: _plantController,
@@ -159,12 +150,11 @@ class _ReportScreenState extends State<ReportScreen> {
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.arrow_drop_down),
                     ),
-                    readOnly: true, // No se puede escribir
-                    onTap: _showPlantDialog, // Llama al selector
+                    readOnly: true,
+                    onTap: _showPlantDialog,
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Campo UT (sin cambios)
                 Expanded(
                   child: TextField(
                     controller: _utController,
@@ -172,7 +162,6 @@ class _ReportScreenState extends State<ReportScreen> {
                       labelText: 'UT',
                       border: OutlineInputBorder(),
                     ),
-                    // Convierte a mayúsculas
                     onChanged: (text) {
                       _utController.value = _utController.value.copyWith(
                         text: text.toUpperCase(),
@@ -185,9 +174,8 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
             const SizedBox(height: 16),
 
-            // --- BOTÓN DE BÚSQUEDA (CONECTADO) ---
             ElevatedButton(
-              onPressed: _performSearch, // Llama a la lógica de búsqueda
+              onPressed: _performSearch,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
               ),
@@ -195,11 +183,9 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
             const SizedBox(height: 16),
 
-            // --- ÁREA DE RESULTADOS (SIN CAMBIOS) ---
             const Text('Resultados', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const Divider(),
 
-            // 9. LÓGICA DE VISUALIZACIÓN DE RESULTADOS
             if (_results.isEmpty)
               const Expanded(
                 child: Center(
@@ -207,7 +193,6 @@ class _ReportScreenState extends State<ReportScreen> {
                 ),
               )
             else
-            // Muestra los resultados en una lista
               Expanded(
                 child: ListView.builder(
                   itemCount: _results.length,
@@ -215,7 +200,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       child: ListTile(
-                        title: Text(_results[index]), // Muestra la línea del archivo
+                        title: Text(_results[index]),
                       ),
                     );
                   },
