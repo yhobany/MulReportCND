@@ -45,7 +45,8 @@ class MainScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: const TabBarView(
+      // --- CAMBIO AQUÍ: 'const' ELIMINADO ---
+      body: TabBarView(
         children: [
           // Pantalla 1
           RegisterScreen(),
@@ -54,12 +55,9 @@ class MainScreen extends StatelessWidget {
           ReportScreen(),
 
           // Pantalla 3
-          EquiposScreen(), // <-- CAMBIO AQUÍ
+          EquiposScreen(),
         ],
       ),
     );
   }
 }
-
-// ¡YA NO NECESITAMOS PLACEHOLDERS!
-// (Puedes borrar el 'EquiposScreen' placeholder que estaba aquí)
