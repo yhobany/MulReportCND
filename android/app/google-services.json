@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "304541974332",
+    "project_id": "mulreportcnd",
+    "storage_bucket": "mulreportcnd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:304541974332:android:92c9bf30a5d4c06e16a839",
+        "android_client_info": {
+          "package_name": "com.example.report_cnd"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcGB7ezkqaCS-8d-bsHRaiQKeAxNuVCJs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,12 +1,14 @@
-// --- IMPORTACIONES (sin cambios) ---
-import 'dart:convert';
+// --- IMPORTACIONES CORREGIDAS ---
+import 'dart:convert'; // <-- ¡CORREGIDO! (dart:convert)
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
+// --- FIN DE LA CORRECCIÓN ---
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'file_manager_locator.dart';
 import 'file_manager_interface.dart';
 import 'equipment_record.dart';
@@ -42,7 +44,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
     _loadRecords();
   }
 
-  // (Funciones _loadRecords, dispose, add/remove, _handleSave no cambian)
+  // (El resto de funciones: _loadRecords, dispose, add/remove, _handleSave, _handleDelete no cambian)
   // ...
   Future<void> _loadRecords() async {
     final records = await fileManager.readEquipmentRecords();
@@ -117,31 +119,34 @@ class _EquiposScreenState extends State<EquiposScreen> {
   }
 
 
-  // --- 📸 FUNCIÓN DE CÁMARA/GALERÍA (ACTUALIZADA) ---
   Future<void> _handleCamera(int? index) async {
-    // 1. Validar UT (común para ambas plataformas)
     if (_utController.text.isEmpty) {
       _showAlertDialog('Error', 'Debe ingresar la UT antes de tomar una foto.');
       return;
     }
 
-    XFile? photo; // Variable para guardar la foto/archivo
+    XFile? photo;
+    final ImageSource source = kIsWeb ? ImageSource.gallery : ImageSource.camera;
 
     if (kIsWeb) {
-      // --- LÓGICA WEB (MODIFICADA) ---
-      // 'image_picker' en web usa 'ImageSource.gallery' para abrir el selector de archivos.
       try {
-        // Ya no mostramos el diálogo de error, abrimos la galería
-        photo = await _picker.pickImage(source: ImageSource.gallery);
+        photo = await _picker.pickImage(
+          source: source,
+          imageQuality: 80,
+          maxWidth: 1024,
+        );
       } catch (e) {
         _showAlertDialog('Error al seleccionar archivo', 'No se pudo cargar la imagen: $e');
       }
     } else {
-      // --- LÓGICA MÓVIL (LA QUE YA TENÍAMOS) ---
       var status = await Permission.camera.request();
       if (status.isGranted) {
         try {
-          photo = await _picker.pickImage(source: ImageSource.camera);
+          photo = await _picker.pickImage(
+            source: source,
+            imageQuality: 80,
+            maxWidth: 1024,
+          );
         } catch (e) {
           _showAlertDialog('Error de Cámara', 'No se pudo iniciar la cámara: $e');
         }
@@ -151,11 +156,8 @@ class _EquiposScreenState extends State<EquiposScreen> {
       }
     }
 
-    // --- LÓGICA COMÚN (después de tomar la foto o seleccionarla) ---
     if (photo != null) {
-      // Generamos un nombre, igual que en móvil
       final String newFileName = await fileManager.getNextImageName(_utController.text);
-
       setState(() {
         if (index == null) {
           _equipoPrincipalController.text = newFileName;
@@ -163,14 +165,11 @@ class _EquiposScreenState extends State<EquiposScreen> {
           _additionalEquipControllers[index].text = newFileName;
         }
       });
-      // NOTA: No copiamos el archivo, solo guardamos el *nombre*
-      // (el archivo real no se sube a ningún lado, solo se registra).
+      // (Paso pendiente de subir a Storage)
     }
   }
-  // --- FIN DE LA FUNCIÓN ACTUALIZADA ---
 
   Future<void> _handleDelete() async {
-    // (Esta función no cambia)
     if (_selectedRecords.isEmpty) {
       _showAlertDialog('Error', 'No se han seleccionado registros para eliminar.');
       return;
@@ -204,21 +203,25 @@ class _EquiposScreenState extends State<EquiposScreen> {
   }
 
   Future<void> _handleExport() async {
-    // (Esta función no cambia)
-    final String? contentOrPath = await fileManager.generateDatedCsvFileWithFilter();
-    if (contentOrPath == null) {
+    final String? csvContent = await fileManager.generateDatedCsvFileWithFilter();
+
+    if (csvContent == null) {
       _showAlertDialog('No hay datos', 'No se encontraron registros con la fecha de hoy ($_currentDate) para exportar.');
       return;
     }
+
+    final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
+    final String fileName = "equipos_$dateSuffix.csv";
+
     if (kIsWeb) {
+      // --- LÓGICA WEB (CORREGIDA) ---
+      // Arreglamos la advertencia de 'anchor' no usado
       try {
-        final String csvContent = contentOrPath;
-        final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
-        final String fileName = "equipos_$dateSuffix.csv";
         final bytes = utf8.encode(csvContent);
         final blob = html_stub.Blob([bytes], 'text/csv');
         final url = html_stub.Url.createObjectUrlFromBlob(blob);
-        final anchor = html_stub.AnchorElement(href: url)
+        // No necesitamos la variable 'anchor', podemos encadenar la llamada
+        html_stub.AnchorElement(href: url)
           ..setAttribute("download", fileName)
           ..click();
         html_stub.Url.revokeObjectUrl(url);
@@ -226,25 +229,32 @@ class _EquiposScreenState extends State<EquiposScreen> {
       } catch (e) {
         _showAlertDialog('Error de Exportación Web', 'No se pudo descargar el archivo: $e');
       }
+
     } else {
-      final String filePath = contentOrPath;
-      await Share.shareXFiles(
-        [XFile(filePath)],
-        text: 'Registros de Equipos del día $_currentDate',
-        subject: 'Reporte CND - Equipos',
-      );
+      // --- LÓGICA MÓVIL ---
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final File tempFile = File('${tempDir.path}/$fileName');
+        await tempFile.writeAsString(csvContent);
+
+        await Share.shareXFiles(
+          [XFile(tempFile.path)],
+          text: 'Registros de Equipos del día $_currentDate',
+          subject: 'Reporte CND - Equipos',
+        );
+      } catch (e) {
+        _showAlertDialog('Error de Exportación Móvil', 'No se pudo compartir el archivo: $e');
+      }
     }
   }
 
   void _showSnackBar(String message) {
-    // (Esta función no cambia)
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
   }
 
   void _showAlertDialog(String title, String content) {
-    // (Esta función no cambia)
     showDialog(
       context: context,
       builder: (BuildContext context) {

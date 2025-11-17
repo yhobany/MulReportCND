@@ -1,28 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'auth_gate.dart'; // <-- 1. IMPORTAMOS EL 'AuthGate'
 
-// 1. IMPORTA las tres pantallas
+// --- IMPORTACIÓN AÑADIDA QUE FALTABA ---
+import 'auth_service.dart';
+// --- FIN DE LA IMPORTACIÓN ---
+
+// Importamos las pantallas que 'AuthGate' necesita conocer
 import 'register_screen.dart';
 import 'report_screen.dart';
-import 'equipos_screen.dart'; // <-- NUEVA IMPORTACIÓN
+import 'equipos_screen.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // --- 2. CAMBIO CLAVE ---
+  // Ya no usamos 'MyApp', ahora usamos 'AuthGate'
+  runApp(const AuthGate());
+  // --- FIN DEL CAMBIO ---
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: DefaultTabController(
-        length: 3,
-        child: MainScreen(),
-      ),
-    );
-  }
-}
+// --- 3. 'MyApp' YA NO SE USA, PERO 'MainScreen' SÍ ---
+// (AuthGate necesita 'MainScreen', así que la dejamos aquí)
 
 class MainScreen extends StatelessWidget {
   const MainScreen({super.key});
@@ -34,6 +37,18 @@ class MainScreen extends StatelessWidget {
         title: const Text('Report CND vFlutter'),
         backgroundColor: Colors.blueGrey[900],
         foregroundColor: Colors.white,
+        // --- AÑADIMOS UN BOTÓN DE "CERRAR SESIÓN" ---
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar Sesión',
+            onPressed: () {
+              // Ahora 'AuthService' sí está definido
+              AuthService().signOut();
+            },
+          )
+        ],
+        // --- FIN DEL CAMBIO ---
         bottom: const TabBar(
           labelColor: Colors.white,
           unselectedLabelColor: Colors.grey,
@@ -45,16 +60,10 @@ class MainScreen extends StatelessWidget {
           ],
         ),
       ),
-      // --- CAMBIO AQUÍ: 'const' ELIMINADO ---
       body: TabBarView(
         children: [
-          // Pantalla 1
           RegisterScreen(),
-
-          // Pantalla 2
           ReportScreen(),
-
-          // Pantalla 3
           EquiposScreen(),
         ],
       ),
