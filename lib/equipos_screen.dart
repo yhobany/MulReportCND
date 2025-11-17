@@ -1,13 +1,14 @@
-// --- IMPORTACIONES (sin cambios) ---
-import 'dart:convert';
+// --- IMPORTACIONES CORREGIDAS ---
+import 'dart:convert'; // <-- ¡CORREGIDO! (dart:convert)
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
+// --- FIN DE LA CORRECCIÓN ---
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart'; // <-- IMPORTANTE para exportar en móvil
+import 'package:path_provider/path_provider.dart';
 import 'file_manager_locator.dart';
 import 'file_manager_interface.dart';
 import 'equipment_record.dart';
@@ -43,7 +44,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
     _loadRecords();
   }
 
-  // (El resto de funciones: _loadRecords, dispose, add/remove, _handleSave, _handleCamera, _handleDelete no cambian)
+  // (El resto de funciones: _loadRecords, dispose, add/remove, _handleSave, _handleDelete no cambian)
   // ...
   Future<void> _loadRecords() async {
     final records = await fileManager.readEquipmentRecords();
@@ -117,15 +118,23 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
   }
 
+
   Future<void> _handleCamera(int? index) async {
     if (_utController.text.isEmpty) {
       _showAlertDialog('Error', 'Debe ingresar la UT antes de tomar una foto.');
       return;
     }
+
     XFile? photo;
+    final ImageSource source = kIsWeb ? ImageSource.gallery : ImageSource.camera;
+
     if (kIsWeb) {
       try {
-        photo = await _picker.pickImage(source: ImageSource.gallery);
+        photo = await _picker.pickImage(
+          source: source,
+          imageQuality: 80,
+          maxWidth: 1024,
+        );
       } catch (e) {
         _showAlertDialog('Error al seleccionar archivo', 'No se pudo cargar la imagen: $e');
       }
@@ -133,7 +142,11 @@ class _EquiposScreenState extends State<EquiposScreen> {
       var status = await Permission.camera.request();
       if (status.isGranted) {
         try {
-          photo = await _picker.pickImage(source: ImageSource.camera);
+          photo = await _picker.pickImage(
+            source: source,
+            imageQuality: 80,
+            maxWidth: 1024,
+          );
         } catch (e) {
           _showAlertDialog('Error de Cámara', 'No se pudo iniciar la cámara: $e');
         }
@@ -142,6 +155,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
             'No se puede usar la cámara sin permisos. Vaya a la configuración de la app para habilitarlos.');
       }
     }
+
     if (photo != null) {
       final String newFileName = await fileManager.getNextImageName(_utController.text);
       setState(() {
@@ -151,6 +165,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
           _additionalEquipControllers[index].text = newFileName;
         }
       });
+      // (Paso pendiente de subir a Storage)
     }
   }
 
@@ -187,9 +202,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
   }
 
-  // --- FUNCIÓN DE EXPORTACIÓN (ACTUALIZADA) ---
   Future<void> _handleExport() async {
-    // 1. Obtener el CONTENIDO CSV (siempre es un String)
     final String? csvContent = await fileManager.generateDatedCsvFileWithFilter();
 
     if (csvContent == null) {
@@ -197,17 +210,18 @@ class _EquiposScreenState extends State<EquiposScreen> {
       return;
     }
 
-    // 2. Definir el nombre del archivo
     final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
     final String fileName = "equipos_$dateSuffix.csv";
 
     if (kIsWeb) {
-      // --- LÓGICA WEB (Descargar archivo) ---
+      // --- LÓGICA WEB (CORREGIDA) ---
+      // Arreglamos la advertencia de 'anchor' no usado
       try {
         final bytes = utf8.encode(csvContent);
         final blob = html_stub.Blob([bytes], 'text/csv');
         final url = html_stub.Url.createObjectUrlFromBlob(blob);
-        final anchor = html_stub.AnchorElement(href: url)
+        // No necesitamos la variable 'anchor', podemos encadenar la llamada
+        html_stub.AnchorElement(href: url)
           ..setAttribute("download", fileName)
           ..click();
         html_stub.Url.revokeObjectUrl(url);
@@ -217,16 +231,14 @@ class _EquiposScreenState extends State<EquiposScreen> {
       }
 
     } else {
-      // --- LÓGICA MÓVIL (Compartir archivo) ---
+      // --- LÓGICA MÓVIL ---
       try {
-        // 1. Guardar el contenido en un archivo temporal
         final tempDir = await getTemporaryDirectory();
         final File tempFile = File('${tempDir.path}/$fileName');
         await tempFile.writeAsString(csvContent);
 
-        // 2. Compartir el archivo temporal
         await Share.shareXFiles(
-          [XFile(tempFile.path)], // Usamos la ruta del archivo temporal
+          [XFile(tempFile.path)],
           text: 'Registros de Equipos del día $_currentDate',
           subject: 'Reporte CND - Equipos',
         );
@@ -236,8 +248,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
   }
 
-  // (Funciones de _showSnackBar y _showAlertDialog no cambian)
-  // ...
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
@@ -265,7 +275,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
   @override
   Widget build(BuildContext context) {
     // (El build() no cambia en absoluto)
-    // ...
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(16.0),
