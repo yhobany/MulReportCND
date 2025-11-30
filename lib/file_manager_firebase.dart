@@ -1,9 +1,9 @@
 // lib/file_manager_firebase.dart
 
-import 'dart:io'; // Necesario para la exportación MÓVIL
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart'; // Necesario para la exportación MÓVIL
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'equipment_record.dart';
@@ -12,8 +12,8 @@ import 'file_manager_interface.dart';
 class FileManager implements FileManagerInterface {
   final _firestore = FirebaseFirestore.instance;
 
-  // (Todas las funciones de REGISTRO no cambian)
-  // ...
+  // ... (saveDataToFile, _parseDate, searchInFile, saveEquipmentToCsv, readEquipmentRecords, deleteEquipmentRecords, getNextImageName NO CAMBIAN)
+
   @override
   Future<bool> saveDataToFile(
       String date, String ut, String point, String description) async {
@@ -75,8 +75,6 @@ class FileManager implements FileManagerInterface {
     return results;
   }
 
-  // (Funciones de EQUIPOS 'save', 'read', 'delete' no cambian)
-  // ...
   @override
   Future<bool> saveEquipmentToCsv(
       String date, String ut, String equipment) async {
@@ -137,7 +135,6 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<String> getNextImageName(String ut) async {
-    // (Esta función no cambia)
     final prefs = await SharedPreferences.getInstance();
     final prefix = ut.length >= 4 ? ut.substring(0, 4).toUpperCase() : ut.toUpperCase();
     final key = "image_counter_$prefix";
@@ -147,71 +144,18 @@ class FileManager implements FileManagerInterface {
     return fileName;
   }
 
-  // --- FUNCIÓN DE EXPORTAR (ACTUALIZADA) ---
+  // --- FUNCIÓN DE EXPORTAR ACTUALIZADA ---
   @override
-  Future<String?> generateDatedCsvFileWithFilter() async {
-
-    // 1. Obtener el rango de hoy
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day); // Hoy a las 00:00
-    final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59); // Hoy a las 23:59
-
-    final filteredRecords = <EquipmentRecord>[];
-
-    try {
-      // 2. Pedir a Firebase solo los registros de hoy
-      final snapshot = await _firestore.collection('equipos')
-          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
-          .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endOfToday))
-          .get();
-
-      // Convertir los documentos a EquipmentRecord
-      for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        filteredRecords.add(EquipmentRecord(
-          id: doc.id,
-          date: data['date_string'] ?? '',
-          ut: data['ut'] ?? '',
-          equipment: data['equipment'] ?? '',
-        ));
-      }
-
-    } catch (e) {
-      print("Error al filtrar por fecha en Firestore: $e");
-      return null; // Hubo un error
+  Future<String?> exportRecords(List<EquipmentRecord> records) async {
+    if (records.isEmpty) {
+      return null;
     }
 
-    if (filteredRecords.isEmpty) {
-      print("No hay registros de hoy para exportar.");
-      return null; // No hay datos
-    }
-
-    // 3. Crear el contenido del CSV (esto es igual que antes)
-    final csvContent = filteredRecords
+    // Convertimos la lista recibida a CSV directamente
+    final csvContent = records
         .map((r) => "${r.date},${r.ut},${r.equipment}")
         .join('\n');
 
-    // 4. Devolver el contenido o la ruta del archivo
-    // (Tu 'equipos_screen.dart' ya sabe cómo manejar esto
-    // gracias a nuestra lógica kIsWeb)
-    try {
-      final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
-      final String fileName = "equipos_$dateSuffix.csv";
-
-      // getTemporaryDirectory() solo funciona en móvil
-      // así que aquí solo devolvemos el contenido si es web,
-      // o creamos el archivo si es móvil.
-      // ¡Espera! 'dart:io' no puede estar en el mismo archivo que 'dart:html'
-      // Nuestra implementación de exportación debe estar en la UI.
-
-      // --- Corrección: Devolvemos el contenido CSV a la UI ---
-      // (La UI ('equipos_screen.dart') se encargará de guardarlo
-      // en un archivo temporal si es móvil, o descargarlo si es web)
-      return csvContent;
-
-    } catch (e) {
-      print("Error al crear el string CSV: $e");
-      return null;
-    }
+    return csvContent; // Devolvemos el contenido para que la UI lo maneje
   }
 }

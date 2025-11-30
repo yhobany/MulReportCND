@@ -7,7 +7,8 @@ import 'file_manager_interface.dart';
 
 class FileManager implements FileManagerInterface {
 
-  // (Todas las funciones de REGISTRO no cambian)
+  // ... (El resto de funciones NO cambian)
+  // Copia todo el contenido anterior de file_manager_mobile.dart EXCEPTO generateDatedCsvFileWithFilter
 
   Future<String> _getStorageDirectory() async {
     final directory = await getApplicationDocumentsDirectory();
@@ -75,8 +76,6 @@ class FileManager implements FileManagerInterface {
     return results;
   }
 
-  // --- EQUIPOS (equipos.csv) ---
-
   Future<File> _getEquiposFile() async {
     final path = await _getStorageDirectory();
     return File('$path/equipos.csv');
@@ -107,16 +106,12 @@ class FileManager implements FileManagerInterface {
         if (line.isEmpty) continue;
         final parts = line.split(',');
         if (parts.length >= 3) {
-          // --- CAMBIO AQUÍ ---
-          // Le pasamos 'id: null' porque este registro viene de un archivo,
-          // no de Firebase.
           results.add(EquipmentRecord(
-              id: null, // <-- AÑADIDO
+              id: null,
               date: parts[0],
               ut: parts[1],
               equipment: parts[2]
           ));
-          // --- FIN DEL CAMBIO ---
         }
       }
     } catch (e) {
@@ -128,8 +123,6 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<bool> deleteEquipmentRecords(List<EquipmentRecord> recordsToDelete) async {
-    // (Esta función no necesita cambios, ya que nuestro '=='
-    // actualizado en EquipmentRecord sabe cómo manejar 'id: null')
     final file = await _getEquiposFile();
     if (!await file.exists()) return false;
     final recordsToDeleteSet = recordsToDelete
@@ -157,7 +150,6 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<String> getNextImageName(String ut) async {
-    // (Esta función no cambia)
     final prefs = await SharedPreferences.getInstance();
     final prefix = ut.length >= 4 ? ut.substring(0, 4).toUpperCase() : ut.toUpperCase();
     final key = "image_counter_$prefix";
@@ -167,31 +159,19 @@ class FileManager implements FileManagerInterface {
     return fileName;
   }
 
+  // --- FUNCIÓN DE EXPORTAR (ACTUALIZADA) ---
   @override
-  Future<String?> generateDatedCsvFileWithFilter() async {
-    // (Esta función no cambia)
-    final masterFile = await _getEquiposFile();
-    if (!await masterFile.exists()) return null;
-    final String currentDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
-    final allRecords = await readEquipmentRecords();
-    final filteredRecords = allRecords.where((record) => record.date == currentDate).toList();
-    if (filteredRecords.isEmpty) {
-      print("No hay registros de hoy para exportar.");
-      return null;
-    }
-    final csvContent = filteredRecords
+  Future<String?> exportRecords(List<EquipmentRecord> records) async {
+    if (records.isEmpty) return null;
+
+    final csvContent = records
         .map((r) => "${r.date},${r.ut},${r.equipment}")
         .join('\n');
-    try {
-      final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
-      final String fileName = "equipos_$dateSuffix.csv";
-      final tempDir = await getTemporaryDirectory();
-      final File tempFile = File('${tempDir.path}/$fileName');
-      await tempFile.writeAsString(csvContent);
-      return tempFile.path;
-    } catch (e) {
-      print("Error al crear archivo CSV temporal: $e");
-      return null;
-    }
+
+    // Para mantener consistencia con la versión móvil, aquí devolvemos la ruta
+    // PERO como cambiamos la interfaz para devolver String? (contenido o ruta?)
+    // Lo mejor es devolver el contenido y dejar que la UI maneje el archivo temporal
+    // para unificar la lógica.
+    return csvContent;
   }
 }

@@ -1,4 +1,4 @@
-import 'dart.html' as html;
+import 'dart:html' as html;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'equipment_record.dart';
@@ -9,7 +9,8 @@ const String _equiposKey = 'equipos_csv_data';
 
 class FileManager implements FileManagerInterface {
 
-  // (saveDataToFile y searchInFile no cambian)
+  // ... (El resto de funciones NO cambian)
+  // Copia todo el contenido anterior EXCEPTO generateDatedCsvFileWithFilter
   @override
   Future<bool> saveDataToFile(
       String date, String ut, String point, String description) async {
@@ -66,8 +67,6 @@ class FileManager implements FileManagerInterface {
     return results;
   }
 
-  // --- Funciones de EQUIPOS (Versión Web) ---
-
   @override
   Future<bool> saveEquipmentToCsv(
       String date, String ut, String equipment) async {
@@ -93,16 +92,12 @@ class FileManager implements FileManagerInterface {
         if (line.isEmpty) continue;
         final parts = line.split(',');
         if (parts.length >= 3) {
-          // --- CAMBIO AQUÍ ---
-          // Le pasamos 'id: null' porque este registro viene de localStorage,
-          // no de Firebase.
           results.add(EquipmentRecord(
-              id: null, // <-- AÑADIDO
+              id: null,
               date: parts[0],
               ut: parts[1],
               equipment: parts[2]
           ));
-          // --- FIN DEL CAMBIO ---
         }
       }
     } catch (e) {
@@ -114,8 +109,6 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<bool> deleteEquipmentRecords(List<EquipmentRecord> recordsToDelete) async {
-    // (Esta función no necesita cambios, ya que nuestro '=='
-    // actualizado en EquipmentRecord sabe cómo manejar 'id: null')
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_equiposKey) ?? [];
     final recordsToDeleteSet = recordsToDelete
@@ -139,7 +132,6 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<String> getNextImageName(String ut) async {
-    // (Esta función no cambia)
     final prefs = await SharedPreferences.getInstance();
     final prefix = ut.length >= 4 ? ut.substring(0, 4).toUpperCase() : ut.toUpperCase();
     final key = "image_counter_$prefix";
@@ -149,17 +141,12 @@ class FileManager implements FileManagerInterface {
     return fileName;
   }
 
+  // --- FUNCIÓN DE EXPORTAR ACTUALIZADA ---
   @override
-  Future<String?> generateDatedCsvFileWithFilter() async {
-    // (Esta función no cambia)
-    print("Generando CSV... (lógica de descarga se manejará en la UI)");
-    final String currentDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
-    final allRecords = await readEquipmentRecords();
-    final filteredRecords = allRecords.where((record) => record.date == currentDate).toList();
-    if (filteredRecords.isEmpty) {
-      return null;
-    }
-    final csvContent = filteredRecords
+  Future<String?> exportRecords(List<EquipmentRecord> records) async {
+    if (records.isEmpty) return null;
+
+    final csvContent = records
         .map((r) => "${r.date},${r.ut},${r.equipment}")
         .join('\n');
     return csvContent;

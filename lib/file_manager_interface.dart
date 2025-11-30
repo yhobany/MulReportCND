@@ -1,14 +1,10 @@
 // lib/file_manager_interface.dart
 
-// 1. Importar nuestro nuevo modelo de datos
 import 'equipment_record.dart';
-
-// 2. Quitamos las importaciones incorrectas (dart.dart y file_manager_mobile.dart)
 
 abstract class FileManagerInterface {
 
   // --- Funciones de Registro ---
-
   Future<bool> saveDataToFile(
       String date, String ut, String point, String description);
 
@@ -16,7 +12,6 @@ abstract class FileManagerInterface {
       String startDateStr, String endDateStr, String ut, String plant);
 
   // --- Funciones de Equipos ---
-
   Future<bool> saveEquipmentToCsv(
       String date, String ut, String equipment);
 
@@ -26,8 +21,8 @@ abstract class FileManagerInterface {
 
   Future<String> getNextImageName(String ut);
 
-  // 3. CAMBIO CLAVE:
-  // En lugar de devolver un 'File' (específico de móvil),
-  // devolvemos un 'String?' (la RUTA al archivo, que es neutral).
-  Future<String?> generateDatedCsvFileWithFilter();
+  // --- CAMBIO AQUÍ ---
+  // Ahora recibe la lista de registros a exportar
+  // Ya no filtra por fecha internamente.
+  Future<String?> exportRecords(List<EquipmentRecord> records);
 }

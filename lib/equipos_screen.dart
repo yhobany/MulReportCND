@@ -1,8 +1,7 @@
-// --- IMPORTACIONES CORREGIDAS ---
-import 'dart:convert'; // <-- ¡CORREGIDO! (dart:convert)
+// ... (Importaciones sin cambios)
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
-// --- FIN DE LA CORRECCIÓN ---
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -22,7 +21,8 @@ class EquiposScreen extends StatefulWidget {
 }
 
 class _EquiposScreenState extends State<EquiposScreen> {
-  // (Propiedades de la clase sin cambios)
+  // (Variables y métodos init/dispose/camera/delete/save sin cambios)
+  // ...
   final FileManagerInterface fileManager = getFileManager();
   final TextEditingController _utController = TextEditingController();
   final TextEditingController _equipoPrincipalController = TextEditingController();
@@ -30,12 +30,8 @@ class _EquiposScreenState extends State<EquiposScreen> {
   List<EquipmentRecord> _savedRecords = [];
   bool _isCollapsed = false;
   Set<EquipmentRecord> _selectedRecords = {};
-  final String _currentDate =
-      "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
-  final List<String> validPrefixes = [
-    "PFM6", "PFM4", "PCM1", "PCM3", "PP30", "PP40",
-    "PP50", "PP90", "PP95", "PP20", "PR"
-  ];
+  final String _currentDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
+  final List<String> validPrefixes = ["PFM6", "PFM4", "PCM1", "PCM3", "PP30", "PP40", "PP50", "PP90", "PP95", "PP20", "PR"];
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -44,8 +40,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
     _loadRecords();
   }
 
-  // (El resto de funciones: _loadRecords, dispose, add/remove, _handleSave, _handleDelete no cambian)
-  // ...
   Future<void> _loadRecords() async {
     final records = await fileManager.readEquipmentRecords();
     setState(() {
@@ -118,23 +112,16 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
   }
 
-
   Future<void> _handleCamera(int? index) async {
     if (_utController.text.isEmpty) {
       _showAlertDialog('Error', 'Debe ingresar la UT antes de tomar una foto.');
       return;
     }
-
     XFile? photo;
     final ImageSource source = kIsWeb ? ImageSource.gallery : ImageSource.camera;
-
     if (kIsWeb) {
       try {
-        photo = await _picker.pickImage(
-          source: source,
-          imageQuality: 80,
-          maxWidth: 1024,
-        );
+        photo = await _picker.pickImage(source: source, imageQuality: 80, maxWidth: 1024);
       } catch (e) {
         _showAlertDialog('Error al seleccionar archivo', 'No se pudo cargar la imagen: $e');
       }
@@ -142,20 +129,14 @@ class _EquiposScreenState extends State<EquiposScreen> {
       var status = await Permission.camera.request();
       if (status.isGranted) {
         try {
-          photo = await _picker.pickImage(
-            source: source,
-            imageQuality: 80,
-            maxWidth: 1024,
-          );
+          photo = await _picker.pickImage(source: source, imageQuality: 80, maxWidth: 1024);
         } catch (e) {
           _showAlertDialog('Error de Cámara', 'No se pudo iniciar la cámara: $e');
         }
       } else if (status.isDenied || status.isPermanentlyDenied) {
-        _showAlertDialog('Permiso Denegado',
-            'No se puede usar la cámara sin permisos. Vaya a la configuración de la app para habilitarlos.');
+        _showAlertDialog('Permiso Denegado', 'No se puede usar la cámara sin permisos.');
       }
     }
-
     if (photo != null) {
       final String newFileName = await fileManager.getNextImageName(_utController.text);
       setState(() {
@@ -165,7 +146,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
           _additionalEquipControllers[index].text = newFileName;
         }
       });
-      // (Paso pendiente de subir a Storage)
     }
   }
 
@@ -180,14 +160,8 @@ class _EquiposScreenState extends State<EquiposScreen> {
         title: const Text('Confirmar eliminación'),
         content: Text('¿Desea eliminar ${_selectedRecords.length} registro(s) seleccionado(s)?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Confirmar'),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Confirmar')),
         ],
       ),
     ) ?? false;
@@ -202,25 +176,35 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
   }
 
+  // --- FUNCIÓN DE EXPORTACIÓN (ACTUALIZADA) ---
   Future<void> _handleExport() async {
-    final String? csvContent = await fileManager.generateDatedCsvFileWithFilter();
+    // 1. DECIDIR QUÉ EXPORTAR
+    // Si hay seleccionados -> exportar seleccionados
+    // Si no hay seleccionados -> exportar TODO (_savedRecords)
+    final List<EquipmentRecord> recordsToExport =
+    _selectedRecords.isNotEmpty ? _selectedRecords.toList() : _savedRecords;
+
+    if (recordsToExport.isEmpty) {
+      _showAlertDialog('No hay datos', 'No hay registros para exportar.');
+      return;
+    }
+
+    // 2. Obtener el CONTENIDO CSV
+    final String? csvContent = await fileManager.exportRecords(recordsToExport);
 
     if (csvContent == null) {
-      _showAlertDialog('No hay datos', 'No se encontraron registros con la fecha de hoy ($_currentDate) para exportar.');
+      _showAlertDialog('Error', 'Error al generar el archivo CSV.');
       return;
     }
 
     final String dateSuffix = DateFormat('dd_MM_yy').format(DateTime.now());
-    final String fileName = "equipos_$dateSuffix.csv";
+    final String fileName = "equipos_export_$dateSuffix.csv"; // Nombre genérico
 
     if (kIsWeb) {
-      // --- LÓGICA WEB (CORREGIDA) ---
-      // Arreglamos la advertencia de 'anchor' no usado
       try {
         final bytes = utf8.encode(csvContent);
         final blob = html_stub.Blob([bytes], 'text/csv');
         final url = html_stub.Url.createObjectUrlFromBlob(blob);
-        // No necesitamos la variable 'anchor', podemos encadenar la llamada
         html_stub.AnchorElement(href: url)
           ..setAttribute("download", fileName)
           ..click();
@@ -229,9 +213,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
       } catch (e) {
         _showAlertDialog('Error de Exportación Web', 'No se pudo descargar el archivo: $e');
       }
-
     } else {
-      // --- LÓGICA MÓVIL ---
       try {
         final tempDir = await getTemporaryDirectory();
         final File tempFile = File('${tempDir.path}/$fileName');
@@ -239,7 +221,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
 
         await Share.shareXFiles(
           [XFile(tempFile.path)],
-          text: 'Registros de Equipos del día $_currentDate',
+          text: 'Exportación de Equipos',
           subject: 'Reporte CND - Equipos',
         );
       } catch (e) {
@@ -274,7 +256,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // (El build() no cambia en absoluto)
+    // (El build() no cambia)
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(16.0),
