@@ -1,6 +1,7 @@
 // lib/file_manager_interface.dart
 
 import 'equipment_record.dart';
+import 'registro_record.dart'; // <-- IMPORTANTE
 
 abstract class FileManagerInterface {
 
@@ -8,8 +9,12 @@ abstract class FileManagerInterface {
   Future<bool> saveDataToFile(
       String date, String ut, String point, String description);
 
-  Future<List<String>> searchInFile(
+  // CAMBIO: Devuelve List<RegistroRecord> en lugar de List<String>
+  Future<List<RegistroRecord>> searchInFile(
       String startDateStr, String endDateStr, String ut, String plant);
+
+  // NUEVO: Función para borrar registros seleccionados
+  Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete);
 
   // --- Funciones de Equipos ---
   Future<bool> saveEquipmentToCsv(
@@ -21,8 +26,9 @@ abstract class FileManagerInterface {
 
   Future<String> getNextImageName(String ut);
 
-  // --- CAMBIO AQUÍ ---
-  // Ahora recibe la lista de registros a exportar
-  // Ya no filtra por fecha internamente.
+  // CAMBIO: Devuelve List<EquipmentRecord> en lugar de List<String>
+  Future<List<EquipmentRecord>> searchInEquiposFile(
+      String startDateStr, String endDateStr, String ut, String plant);
+
   Future<String?> exportRecords(List<EquipmentRecord> records);
 }

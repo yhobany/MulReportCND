@@ -1,5 +1,3 @@
-// lib/file_manager_firebase.dart
-
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -7,12 +5,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'equipment_record.dart';
+import 'registro_record.dart'; // <-- IMPORTANTE
 import 'file_manager_interface.dart';
 
 class FileManager implements FileManagerInterface {
   final _firestore = FirebaseFirestore.instance;
 
-  // ... (saveDataToFile, _parseDate, searchInFile, saveEquipmentToCsv, readEquipmentRecords, deleteEquipmentRecords, getNextImageName NO CAMBIAN)
+  // --- REGISTROS ---
 
   @override
   Future<bool> saveDataToFile(
@@ -36,17 +35,17 @@ class FileManager implements FileManagerInterface {
   DateTime? _parseDate(String dateStr) {
     try {
       return DateFormat('d/M/yyyy').parseStrict(dateStr);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
+  // ACTUALIZADO: Devuelve objetos RegistroRecord
   @override
-  Future<List<String>> searchInFile(
+  Future<List<RegistroRecord>> searchInFile(
       String startDateStr, String endDateStr, String ut, String plant) async {
-    final results = <String>[];
+    final results = <RegistroRecord>[];
     try {
       Query query = _firestore.collection('registros');
+      // (Lógica de filtros de fecha igual que antes...)
       final DateTime? startDate = _parseDate(startDateStr);
       final DateTime? endDate = _parseDate(endDateStr);
       if (startDate != null) {
@@ -60,13 +59,24 @@ class FileManager implements FileManagerInterface {
         query = query.where('ut', isGreaterThanOrEqualTo: plant)
             .where('ut', isLessThan: '$plant\uf8ff');
       }
+
       final snapshot = await query.get();
+
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final String recordUt = data['ut'] ?? '';
+        // Filtro local de UT (contains)
         final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
+
         if (matchesUt) {
-          results.add("${data['date_string']},${recordUt},${data['point']},${data['description']}");
+          // CREAMOS EL OBJETO CON EL ID
+          results.add(RegistroRecord(
+            id: doc.id,
+            date: data['date_string'] ?? '',
+            ut: recordUt,
+            point: data['point'] ?? '',
+            description: data['description'] ?? '',
+          ));
         }
       }
     } catch (e) {
@@ -75,9 +85,78 @@ class FileManager implements FileManagerInterface {
     return results;
   }
 
+  // NUEVO: Borrar Registros
   @override
-  Future<bool> saveEquipmentToCsv(
-      String date, String ut, String equipment) async {
+  Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete) async {
+    try {
+      final collection = _firestore.collection('registros');
+      final batch = _firestore.batch();
+      for (var record in recordsToDelete) {
+        if (record.id != null) {
+          batch.delete(collection.doc(record.id));
+        }
+      }
+      await batch.commit();
+      return true;
+    } catch (e) {
+      print("Error al eliminar de Firestore (registros): $e");
+      return false;
+    }
+  }
+
+  // --- EQUIPOS ---
+
+  // ACTUALIZADO: Devuelve objetos EquipmentRecord
+  @override
+  Future<List<EquipmentRecord>> searchInEquiposFile(
+      String startDateStr, String endDateStr, String ut, String plant) async {
+    final results = <EquipmentRecord>[];
+    try {
+      Query query = _firestore.collection('equipos');
+      // (Mismos filtros de fecha...)
+      final DateTime? startDate = _parseDate(startDateStr);
+      final DateTime? endDate = _parseDate(endDateStr);
+      if (startDate != null) {
+        query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+      }
+      if (endDate != null) {
+        final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+        query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay));
+      }
+      if (plant.isNotEmpty) {
+        query = query.where('ut', isGreaterThanOrEqualTo: plant)
+            .where('ut', isLessThan: '$plant\uf8ff');
+      }
+
+      final snapshot = await query.get();
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final String recordUt = data['ut'] ?? '';
+        final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
+
+        if (matchesUt) {
+          // CREAMOS EL OBJETO CON EL ID
+          results.add(EquipmentRecord(
+            id: doc.id,
+            date: data['date_string'] ?? '',
+            ut: recordUt,
+            equipment: data['equipment'] ?? '',
+          ));
+        }
+      }
+    } catch (e) {
+      print("Error al buscar en Firestore (equipos): $e");
+    }
+    return results;
+  }
+
+  // (El resto de funciones save, read, deleteEquipment, getNext, export NO CAMBIAN)
+  // Copia el resto de las funciones de tu archivo anterior tal cual estaban.
+  // (saveEquipmentToCsv, readEquipmentRecords, deleteEquipmentRecords, getNextImageName, exportRecords)
+
+  @override
+  Future<bool> saveEquipmentToCsv(String date, String ut, String equipment) async {
     try {
       final collection = _firestore.collection('equipos');
       await collection.add({
@@ -144,18 +223,12 @@ class FileManager implements FileManagerInterface {
     return fileName;
   }
 
-  // --- FUNCIÓN DE EXPORTAR ACTUALIZADA ---
   @override
   Future<String?> exportRecords(List<EquipmentRecord> records) async {
-    if (records.isEmpty) {
-      return null;
-    }
-
-    // Convertimos la lista recibida a CSV directamente
+    if (records.isEmpty) return null;
     final csvContent = records
         .map((r) => "${r.date},${r.ut},${r.equipment}")
         .join('\n');
-
-    return csvContent; // Devolvemos el contenido para que la UI lo maneje
+    return csvContent;
   }
 }

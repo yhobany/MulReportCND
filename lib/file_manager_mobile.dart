@@ -3,12 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'equipment_record.dart';
+import 'registro_record.dart'; // <-- IMPORTANTE
 import 'file_manager_interface.dart';
 
 class FileManager implements FileManagerInterface {
-
-  // ... (El resto de funciones NO cambian)
-  // Copia todo el contenido anterior de file_manager_mobile.dart EXCEPTO generateDatedCsvFileWithFilter
 
   Future<String> _getStorageDirectory() async {
     final directory = await getApplicationDocumentsDirectory();
@@ -42,22 +40,117 @@ class FileManager implements FileManagerInterface {
     }
   }
 
+  // --- ACTUALIZADO: Devuelve objetos RegistroRecord ---
   @override
-  Future<List<String>> searchInFile(
+  Future<List<RegistroRecord>> searchInFile(
       String startDateStr, String endDateStr, String ut, String plant) async {
-    final results = <String>[];
+    final results = <RegistroRecord>[];
     final file = await _getRegistroFile();
     if (!await file.exists()) return results;
+
     final DateTime? startDate = _parseDate(startDateStr);
     final DateTime? endDate = _parseDate(endDateStr);
+
     try {
       final lines = await file.readAsLines();
       for (final line in lines) {
         if (line.isEmpty) continue;
         final parts = line.split(',');
-        if (parts.length < 4) continue;
+        if (parts.length >= 4) {
+          final String recordDateStr = parts[0];
+          final String recordUt = parts[1];
+          final String point = parts[2];
+          final String description = parts[3];
+
+          bool matchesDate = true;
+          final DateTime? recordDate = _parseDate(recordDateStr);
+
+          if (recordDate != null) {
+            if (startDate != null && recordDate.isBefore(startDate)) matchesDate = false;
+            if (endDate != null && recordDate.isAfter(endDate)) matchesDate = false;
+          } else if (startDate != null || endDate != null) {
+            matchesDate = false;
+          }
+
+          final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
+          final bool matchesPlant = plant.isEmpty || recordUt.toLowerCase().startsWith(plant.toLowerCase());
+
+          if (matchesDate && matchesUt && matchesPlant) {
+            // Devolvemos un objeto con ID nulo (porque es un archivo local)
+            results.add(RegistroRecord(
+                id: null,
+                date: recordDateStr,
+                ut: recordUt,
+                point: point,
+                description: description
+            ));
+          }
+        }
+      }
+    } catch (e) {
+      print("Error al leer/buscar en registro.txt: $e");
+    }
+    return results;
+  }
+
+  // --- NUEVO: Implementación de borrar registros ---
+  @override
+  Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete) async {
+    final file = await _getRegistroFile();
+    if (!await file.exists()) return false;
+
+    // Creamos un set de las líneas a borrar para comparar
+    final recordsToDeleteSet = recordsToDelete
+        .map((r) => "${r.date},${r.ut},${r.point},${r.description}")
+        .toSet();
+
+    try {
+      final lines = await file.readAsLines();
+      final linesToKeep = <String>[];
+
+      for (final line in lines) {
+        if (line.isNotEmpty && !recordsToDeleteSet.contains(line)) {
+          linesToKeep.add(line);
+        }
+      }
+
+      await file.writeAsString(linesToKeep.join('\n'));
+      if (linesToKeep.isNotEmpty) await file.writeAsString('\n', mode: FileMode.append);
+
+      return true;
+    } catch (e) {
+      print("Error al eliminar de registro.txt: $e");
+      return false;
+    }
+  }
+
+  Future<File> _getEquiposFile() async {
+    final path = await _getStorageDirectory();
+    return File('$path/equipos.csv');
+  }
+
+  // --- ACTUALIZADO: Devuelve objetos EquipmentRecord ---
+  @override
+  Future<List<EquipmentRecord>> searchInEquiposFile(
+      String startDateStr, String endDateStr, String ut, String plant) async {
+    final results = <EquipmentRecord>[];
+    final file = await _getEquiposFile();
+    if (!await file.exists()) return results;
+
+    final DateTime? startDate = _parseDate(startDateStr);
+    final DateTime? endDate = _parseDate(endDateStr);
+
+    try {
+      final lines = await file.readAsLines();
+      for (final line in lines) {
+        if (line.isEmpty) continue;
+        final parts = line.split(',');
+        if (parts.length < 3) continue;
+
         final String recordDateStr = parts[0];
         final String recordUt = parts[1];
+        final String recordEquip = parts[2];
+
         bool matchesDate = true;
         final DateTime? recordDate = _parseDate(recordDateStr);
         if (recordDate != null) {
@@ -66,19 +159,23 @@ class FileManager implements FileManagerInterface {
         } else if (startDate != null || endDate != null) {
           matchesDate = false;
         }
+
         final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
         final bool matchesPlant = plant.isEmpty || recordUt.toLowerCase().startsWith(plant.toLowerCase());
-        if (matchesDate && matchesUt && matchesPlant) results.add(line);
+
+        if (matchesDate && matchesUt && matchesPlant) {
+          results.add(EquipmentRecord(
+              id: null,
+              date: recordDateStr,
+              ut: recordUt,
+              equipment: recordEquip
+          ));
+        }
       }
     } catch (e) {
-      print("Error al leer/buscar en registro.txt: $e");
+      print("Error al buscar en equipos.csv: $e");
     }
     return results;
-  }
-
-  Future<File> _getEquiposFile() async {
-    final path = await _getStorageDirectory();
-    return File('$path/equipos.csv');
   }
 
   @override
@@ -128,7 +225,6 @@ class FileManager implements FileManagerInterface {
     final recordsToDeleteSet = recordsToDelete
         .map((r) => "${r.date},${r.ut},${r.equipment}")
         .toSet();
-    if (recordsToDeleteSet.isEmpty) return true;
     try {
       final lines = await file.readAsLines();
       final linesToKeep = <String>[];
@@ -138,9 +234,7 @@ class FileManager implements FileManagerInterface {
         }
       }
       await file.writeAsString(linesToKeep.join('\n'));
-      if (linesToKeep.isNotEmpty) {
-        await file.writeAsString('\n', mode: FileMode.append);
-      }
+      if (linesToKeep.isNotEmpty) await file.writeAsString('\n', mode: FileMode.append);
       return true;
     } catch (e) {
       print("Error al eliminar de equipos.csv: $e");
@@ -159,19 +253,12 @@ class FileManager implements FileManagerInterface {
     return fileName;
   }
 
-  // --- FUNCIÓN DE EXPORTAR (ACTUALIZADA) ---
   @override
   Future<String?> exportRecords(List<EquipmentRecord> records) async {
     if (records.isEmpty) return null;
-
     final csvContent = records
         .map((r) => "${r.date},${r.ut},${r.equipment}")
         .join('\n');
-
-    // Para mantener consistencia con la versión móvil, aquí devolvemos la ruta
-    // PERO como cambiamos la interfaz para devolver String? (contenido o ruta?)
-    // Lo mejor es devolver el contenido y dejar que la UI maneje el archivo temporal
-    // para unificar la lógica.
     return csvContent;
   }
 }
