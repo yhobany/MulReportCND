@@ -1,11 +1,12 @@
 // lib/registro_record.dart
 
 class RegistroRecord {
-  final String? id; // ID de la base de datos
+  final String? id;
   final String date;
   final String ut;
   final String point;
   final String description;
+  final String priority; // <-- NUEVO CAMPO
 
   RegistroRecord({
     this.id,
@@ -13,9 +14,9 @@ class RegistroRecord {
     required this.ut,
     required this.point,
     required this.description,
+    this.priority = 'Medio', // Valor por defecto para compatibilidad
   });
 
-  // Para que los Checkbox funcionen correctamente
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -24,9 +25,10 @@ class RegistroRecord {
     return date == other.date &&
         ut == other.ut &&
         point == other.point &&
-        description == other.description;
+        description == other.description &&
+        priority == other.priority; // <-- Incluir en comparación
   }
 
   @override
-  int get hashCode => id?.hashCode ?? Object.hash(date, ut, point, description);
+  int get hashCode => id?.hashCode ?? Object.hash(date, ut, point, description, priority);
 }

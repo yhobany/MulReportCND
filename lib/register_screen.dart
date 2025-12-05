@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-// --- CAMBIOS DE IMPORTACIÓN ---
-import 'file_manager_locator.dart'; // Importamos el "selector"
-import 'file_manager_interface.dart'; // Importamos la interfaz
-import 'equipment_record.dart'; // (Ya no se necesita aquí, pero lo dejamos por si acaso)
-// --- FIN DE CAMBIOS ---
+import 'file_manager_locator.dart';
+import 'file_manager_interface.dart';
+import 'equipment_record.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,10 +11,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // --- CAMBIO DE INICIALIZACIÓN ---
-  // Ahora le pedimos al "selector" que nos dé la implementación correcta
   final FileManagerInterface fileManager = getFileManager();
-  // --- FIN DEL CAMBIO ---
 
   final TextEditingController _utController = TextEditingController();
   final TextEditingController _pointController = TextEditingController();
@@ -24,6 +19,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   final String _currentDate =
       "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
+
+  // --- NUEVO: Variable para prioridad ---
+  String _selectedPriority = 'Medio';
+  final List<String> _priorities = ['Alto', 'Medio', 'Bajo'];
 
   final List<String> validPrefixes = [
     "PFM6", "PFM4", "PCM1", "PCM3", "PP30", "PP40",
@@ -33,9 +32,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final List<String> pointOptions = [
     "Vib/soporte", "Vib/reductor", "Roce",
     "Holgura", "Golpeteo", "Ruido/bandas",
-    "Alta/temp", "Vib/estructural",
-    "Soltura/sop", "Ruido/acop",
-    "Engranamiento", "Falta/lub", "NA - None"
+    "Alta/temp", "Vib/estructural", "Desalineacion",
+    "Soltura/sop", "Ruido/acop", "Bote",
+    "Engranamiento", "Falta/lub",
+    "Ruido/motor", "Fuga/sello",
+    "NA"
   ];
 
   @override
@@ -46,8 +47,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // (El resto del archivo, _handleSave, build, etc., no cambia en absoluto)
-  // ...
   Future<void> _handleSave() async {
     FocusScope.of(context).unfocus();
 
@@ -67,11 +66,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // CAMBIO: Enviamos la prioridad
     bool success = await fileManager.saveDataToFile(
       _currentDate,
       ut,
       point,
       description,
+      _selectedPriority,
     );
 
     if (success) {
@@ -79,6 +80,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _utController.clear();
       _pointController.clear();
       _descriptionController.clear();
+      setState(() { _selectedPriority = 'Medio'; }); // Reset prioridad
     } else {
       _showAlertDialog('Error', 'No se pudo guardar el registro.');
     }
@@ -179,17 +181,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 16),
 
-          const Text('Punto', style: TextStyle(fontWeight: FontWeight.bold)),
-          TextField(
-            controller: _pointController,
-            decoration: const InputDecoration(
-              hintText: 'Seleccione punto',
-              border: OutlineInputBorder(),
-              suffixIcon: Icon(Icons.arrow_drop_down),
-            ),
-            readOnly: true,
-            onTap: _showPointDialog,
+          // --- FILA MODIFICADA: Punto y Prioridad ---
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Punto', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextField(
+                      controller: _pointController,
+                      decoration: const InputDecoration(
+                        hintText: 'Seleccione punto',
+                        border: OutlineInputBorder(),
+                        suffixIcon: Icon(Icons.arrow_drop_down),
+                      ),
+                      readOnly: true,
+                      onTap: _showPointDialog,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Prioridad', style: TextStyle(fontWeight: FontWeight.bold)),
+                    DropdownButtonFormField<String>(
+                      value: _selectedPriority,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      ),
+                      items: _priorities.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        setState(() {
+                          _selectedPriority = newValue!;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          // ------------------------------------------
 
           const SizedBox(height: 16),
 
@@ -225,6 +270,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _utController.clear();
                   _pointController.clear();
                   _descriptionController.clear();
+                  setState(() { _selectedPriority = 'Medio'; });
                 },
                 child: const Text('Limpiar'),
               ),
