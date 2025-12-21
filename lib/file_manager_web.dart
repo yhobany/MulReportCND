@@ -10,15 +10,13 @@ const String _equiposKey = 'equipos_csv_data';
 
 class FileManager implements FileManagerInterface {
 
-  // CAMBIO: Añadido 'priority'
   @override
   Future<bool> saveDataToFile(
-      String date, String ut, String point, String description, String priority) async {
+      String date, String ut, String point, String description, String priority, String status) async { // <-- Param 'status'
     try {
       final prefs = await SharedPreferences.getInstance();
       final List<String> records = prefs.getStringList(_registroKey) ?? [];
-      // Guardamos la prioridad al final
-      records.add("$date,$ut,$point,$description,$priority");
+      records.add("$date,$ut,$point,$description,$priority,$status");
       await prefs.setStringList(_registroKey, records);
       return true;
     } catch (e) {
@@ -33,10 +31,9 @@ class FileManager implements FileManagerInterface {
     } catch (e) { return null; }
   }
 
-  // CAMBIO: Añadido filtro 'priority'
   @override
   Future<List<RegistroRecord>> searchInFile(
-      String startDateStr, String endDateStr, String ut, String plant, String priority) async {
+      String startDateStr, String endDateStr, String ut, String plant, String priority, String status) async { // <-- Param 'status'
     final results = <RegistroRecord>[];
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_registroKey) ?? [];
@@ -50,8 +47,8 @@ class FileManager implements FileManagerInterface {
         if (parts.length >= 4) {
           final String recordDateStr = parts[0];
           final String recordUt = parts[1];
-          // Compatibilidad
           final String recordPriority = parts.length >= 5 ? parts[4] : 'Medio';
+          final String recordStatus = parts.length >= 6 ? parts[5] : 'Abierto'; // <-- Compatibilidad
 
           bool matchesDate = true;
           final DateTime? recordDate = _parseDate(recordDateStr);
@@ -65,8 +62,9 @@ class FileManager implements FileManagerInterface {
           final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
           final bool matchesPlant = plant.isEmpty || recordUt.toLowerCase().startsWith(plant.toLowerCase());
           final bool matchesPriority = priority.isEmpty || priority == 'Todas' || recordPriority == priority;
+          final bool matchesStatus = status.isEmpty || status == 'Todos' || recordStatus == status; // <-- Filtro
 
-          if (matchesDate && matchesUt && matchesPlant && matchesPriority) {
+          if (matchesDate && matchesUt && matchesPlant && matchesPriority && matchesStatus) {
             results.add(RegistroRecord(
               id: null,
               date: recordDateStr,
@@ -74,15 +72,60 @@ class FileManager implements FileManagerInterface {
               point: parts[2],
               description: parts[3],
               priority: recordPriority,
+              status: recordStatus,
             ));
           }
         }
       }
+      results.sort((a, b) {
+        final dateA = _parseDate(a.date) ?? DateTime(1900);
+        final dateB = _parseDate(b.date) ?? DateTime(1900);
+        return dateB.compareTo(dateA);
+      });
     } catch (e) {
       print("Error al buscar en SharedPreferences (web): $e");
     }
     return results;
   }
+
+  // --- NUEVA FUNCIÓN: Actualizar Estatus ---
+  @override
+  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> lines = prefs.getStringList(_registroKey) ?? [];
+      final newLines = <String>[];
+      bool found = false;
+
+      for (final line in lines) {
+        if (line.isEmpty) continue;
+        final parts = line.split(',');
+        if (parts.length >= 4) {
+          final p = parts.length >= 5 ? parts[4] : 'Medio';
+          final s = parts.length >= 6 ? parts[5] : 'Abierto';
+          final currentRecord = RegistroRecord(
+              id: null, date: parts[0], ut: parts[1], point: parts[2], description: parts[3], priority: p, status: s
+          );
+
+          if (currentRecord == record) {
+            final newLine = "${record.date},${record.ut},${record.point},${record.description},${record.priority},$newStatus";
+            newLines.add(newLine);
+            found = true;
+          } else {
+            newLines.add(line);
+          }
+        }
+      }
+
+      if (found) {
+        await prefs.setStringList(_registroKey, newLines);
+        return true;
+      }
+      return false;
+    } catch (e) { return false; }
+  }
+
+  // --- RESTO DE FUNCIONES (Sin cambios) ---
 
   @override
   Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete) async {
@@ -97,7 +140,8 @@ class FileManager implements FileManagerInterface {
         final parts = line.split(',');
         if (parts.length >= 4) {
           final p = parts.length >= 5 ? parts[4] : 'Medio';
-          final rec = RegistroRecord(id: null, date: parts[0], ut: parts[1], point: parts[2], description: parts[3], priority: p);
+          final s = parts.length >= 6 ? parts[5] : 'Abierto';
+          final rec = RegistroRecord(id: null, date: parts[0], ut: parts[1], point: parts[2], description: parts[3], priority: p, status: s);
           if (!recordsToDeleteSet.contains(rec)) {
             linesToKeep.add(line);
           }
@@ -108,14 +152,8 @@ class FileManager implements FileManagerInterface {
     } catch (e) { return false; }
   }
 
-  // --- EL RESTO DEL ARCHIVO (Equipos) SE COPIA EXACTAMENTE IGUAL ---
-  // (Copia las funciones de equipos searchInEquiposFile, saveEquipmentToCsv,
-  // readEquipmentRecords, deleteEquipmentRecords, getNextImageName, exportRecords
-  // tal como estaban en tu archivo anterior).
-
   @override
   Future<List<EquipmentRecord>> searchInEquiposFile(String startDateStr, String endDateStr, String ut, String plant) async {
-    // ... (Misma implementación)
     final results = <EquipmentRecord>[];
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_equiposKey) ?? [];
@@ -141,7 +179,12 @@ class FileManager implements FileManagerInterface {
           results.add(EquipmentRecord(id: null, date: recordDateStr, ut: recordUt, equipment: parts[2]));
         }
       }
-    } catch (e) { }
+      results.sort((a, b) {
+        final dateA = _parseDate(a.date) ?? DateTime(1900);
+        final dateB = _parseDate(b.date) ?? DateTime(1900);
+        return dateB.compareTo(dateA);
+      });
+    } catch (e) {}
     return results;
   }
 
@@ -170,7 +213,11 @@ class FileManager implements FileManagerInterface {
         }
       }
     } catch (e) { }
-    results.sort((a, b) => b.date.compareTo(a.date));
+    results.sort((a, b) {
+      final dateA = _parseDate(a.date) ?? DateTime(1900);
+      final dateB = _parseDate(b.date) ?? DateTime(1900);
+      return dateB.compareTo(dateA);
+    });
     return results;
   }
 

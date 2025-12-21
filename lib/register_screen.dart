@@ -20,7 +20,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final String _currentDate =
       "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
 
-  // --- NUEVO: Variable para prioridad ---
   String _selectedPriority = 'Medio';
   final List<String> _priorities = ['Alto', 'Medio', 'Bajo'];
 
@@ -32,11 +31,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final List<String> pointOptions = [
     "Vib/soporte", "Vib/reductor", "Roce",
     "Holgura", "Golpeteo", "Ruido/bandas",
-    "Alta/temp", "Vib/estructural", "Desalineacion",
-    "Soltura/sop", "Ruido/acop", "Bote",
-    "Engranamiento", "Falta/lub",
-    "Ruido/motor", "Fuga/sello",
-    "NA"
+    "Alta/temp", "Vib/estructural",
+    "Soltura/sop", "Ruido/acop",
+    "Engranamiento", "Falta/lub", "NA - None"
   ];
 
   @override
@@ -66,13 +63,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // CAMBIO: Enviamos la prioridad
+    // CAMBIO: Enviamos 'Abierto' como estatus por defecto
     bool success = await fileManager.saveDataToFile(
       _currentDate,
       ut,
       point,
       description,
       _selectedPriority,
+      'Abierto', // <-- Estatus inicial
     );
 
     if (success) {
@@ -80,7 +78,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _utController.clear();
       _pointController.clear();
       _descriptionController.clear();
-      setState(() { _selectedPriority = 'Medio'; }); // Reset prioridad
+      setState(() { _selectedPriority = 'Medio'; });
     } else {
       _showAlertDialog('Error', 'No se pudo guardar el registro.');
     }
@@ -181,7 +179,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 16),
 
-          // --- FILA MODIFICADA: Punto y Prioridad ---
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -234,7 +231,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
-          // ------------------------------------------
 
           const SizedBox(height: 16),
 

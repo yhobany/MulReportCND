@@ -1,3 +1,5 @@
+// lib/report_screen.dart
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
@@ -33,9 +35,14 @@ class _ReportScreenState extends State<ReportScreen> {
   String _searchType = 'Registros';
   final List<String> _searchOptions = ['Registros', 'Equipos'];
 
-  // --- NUEVO: Filtro de Prioridad ---
+  // Filtro de Prioridad
   String _searchPriority = 'Todas';
   final List<String> _priorityOptions = ['Todas', 'Alto', 'Medio', 'Bajo'];
+
+  // Filtro de Estatus
+  String _searchStatus = 'Todos';
+  final List<String> _statusFilterOptions = ['Todos', 'Abierto', 'En Proceso', 'Culminado'];
+  final List<String> _statusEditOptions = ['Abierto', 'En Proceso', 'Culminado'];
 
   bool _areFiltersVisible = true;
 
@@ -55,7 +62,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Future<void> _performSearch() async {
     FocusScope.of(context).unfocus();
-    _selectedItems.clear();
+    // No limpiamos selección para mejor UX al editar
 
     if (_searchType == 'Registros') {
       final results = await fileManager.searchInFile(
@@ -63,14 +70,14 @@ class _ReportScreenState extends State<ReportScreen> {
         _endDateController.text,
         _utController.text,
         _plantController.text,
-        _searchPriority, // <-- Enviamos filtro
+        _searchPriority,
+        _searchStatus,
       );
       setState(() {
         _results = results;
         if (_results.isNotEmpty) _areFiltersVisible = false;
       });
     } else {
-      // (Equipos no tiene prioridad, así que ignoramos el filtro o pasamos 'Todas')
       final results = await fileManager.searchInEquiposFile(
         _startDateController.text,
         _endDateController.text,
@@ -84,19 +91,81 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  // ... (Funciones _handleDelete, _handleExport, _selectDate, _showPlantDialog,
-  // _toggleSelection, _toggleSelectAll NO CAMBIAN, cópialas del archivo anterior)
+  // --- Función para cambiar Estatus (con actualización local) ---
+  void _showEditStatusDialog(RegistroRecord item) {
+    String newStatus = item.status;
 
-  // (Para ahorrar espacio, incluyo solo el build actualizado)
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Actualizar Estatus'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("UT: ${item.ut}", style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text("Seleccione el nuevo estatus:"),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: newStatus,
+                items: _statusEditOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (val) {
+                  if (val != null) newStatus = val;
+                },
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context); // Cerrar diálogo
 
-  // ... (Inserta aquí las funciones auxiliares que omití) ...
+                // 1. Actualizar en Backend
+                bool success = await fileManager.updateRegistroStatus(item, newStatus);
 
-  // ---------------------------------------------------------------------------
-  // NOTA: Asegúrate de copiar las funciones auxiliares que omití arriba
-  // (_handleDelete, _handleExport, etc.) del código que te di en la respuesta anterior.
-  // ---------------------------------------------------------------------------
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Estatus actualizado a: $newStatus'))
+                  );
 
-  // --- Solo incluyo las funciones que no cambian para que el código compile si copias/pegas todo ---
+                  // 2. Actualización Local Inmediata
+                  setState(() {
+                    int index = _results.indexOf(item);
+                    if (index != -1) {
+                      final oldItem = _results[index] as RegistroRecord;
+                      final newItem = RegistroRecord(
+                        id: oldItem.id,
+                        date: oldItem.date,
+                        ut: oldItem.ut,
+                        point: oldItem.point,
+                        description: oldItem.description,
+                        priority: oldItem.priority,
+                        status: newStatus,
+                      );
+                      _results[index] = newItem;
+                    }
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error al actualizar estatus'))
+                  );
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _handleDelete() async {
     if (_selectedItems.isEmpty) return;
     bool confirm = await showDialog(
@@ -122,6 +191,7 @@ class _ReportScreenState extends State<ReportScreen> {
       }
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eliminados correctamente')));
+        _selectedItems.clear();
         _performSearch();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al eliminar')));
@@ -232,6 +302,15 @@ class _ReportScreenState extends State<ReportScreen> {
     });
   }
 
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Abierto': return Colors.red.shade700;
+      case 'En Proceso': return Colors.orange.shade800;
+      case 'Culminado': return Colors.green.shade700;
+      default: return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -239,7 +318,7 @@ class _ReportScreenState extends State<ReportScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // --- CABECERA MODIFICADA: Tipo y Prioridad ---
+            // --- CABECERA ---
             Row(
               children: [
                 Expanded(
@@ -256,7 +335,6 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                 ),
 
-                // Mostrar filtro de prioridad SOLO si estamos en 'Registros'
                 if (_searchType == 'Registros') ...[
                   const SizedBox(width: 8),
                   Expanded(
@@ -283,6 +361,7 @@ class _ReportScreenState extends State<ReportScreen> {
               ],
             ),
 
+            // --- ÁREA COLAPSABLE DE FILTROS ---
             AnimatedSize(
               duration: const Duration(milliseconds: 300),
               child: Container(
@@ -305,6 +384,27 @@ class _ReportScreenState extends State<ReportScreen> {
                         Expanded(child: TextField(controller: _utController, decoration: const InputDecoration(labelText: 'UT', border: OutlineInputBorder()), onChanged: (t) => _utController.value = _utController.value.copyWith(text: t.toUpperCase(), selection: TextSelection.collapsed(offset: t.length)))),
                       ],
                     ),
+
+                    if (_searchType == 'Registros') ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _searchStatus,
+                              decoration: const InputDecoration(
+                                labelText: 'Estatus del Registro',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              items: _statusFilterOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                              onChanged: (v) => setState(() { _searchStatus = v!; }),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
                     const SizedBox(height: 16),
 
                     ElevatedButton(
@@ -319,7 +419,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
             const SizedBox(height: 16),
 
-            // Botones de Acción (Igual que antes)
+            // Botones de Acción
             if (_results.isNotEmpty || _selectedItems.isNotEmpty)
               Row(
                 children: [
@@ -337,6 +437,7 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(height: 8),
             const Divider(),
 
+            // Lista de Resultados
             if (_results.isEmpty)
               const Expanded(child: Center(child: Text('No hay resultados.')))
             else
@@ -348,15 +449,57 @@ class _ReportScreenState extends State<ReportScreen> {
                     final isSelected = _selectedItems.contains(item);
 
                     String title = "";
-                    String subtitle = "";
+                    Widget? subtitleWidget;
+                    Widget? trailingWidget;
 
                     if (item is RegistroRecord) {
                       title = "${item.ut} (${item.date})";
-                      // MOSTRAR LA PRIORIDAD EN LA TARJETA
-                      subtitle = "Prioridad: ${item.priority}\n${item.point}\n${item.description}";
+                      subtitleWidget = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.grey),
+                                ),
+                                child: Text("Prioridad: ${item.priority}", style: const TextStyle(fontSize: 12)),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(item.status).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: _getStatusColor(item.status)),
+                                ),
+                                child: Text(
+                                    item.status.toUpperCase(),
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: _getStatusColor(item.status)
+                                    )
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text("${item.point}\n${item.description}"),
+                        ],
+                      );
+                      trailingWidget = IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => _showEditStatusDialog(item),
+                        tooltip: "Editar Estatus",
+                      );
                     } else if (item is EquipmentRecord) {
                       title = "${item.ut} (${item.date})";
-                      subtitle = item.equipment;
+                      subtitleWidget = Text(item.equipment);
                     }
 
                     return Card(
@@ -368,7 +511,8 @@ class _ReportScreenState extends State<ReportScreen> {
                           onChanged: (bool? value) => _toggleSelection(item),
                         ),
                         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(subtitle),
+                        subtitle: subtitleWidget,
+                        trailing: trailingWidget,
                         onTap: () => _toggleSelection(item),
                       ),
                     );

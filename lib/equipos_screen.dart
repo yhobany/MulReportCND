@@ -1,10 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:intl/intl.dart'; // Para la fecha
+// import 'package:permission_handler/permission_handler.dart'; // Ya no es estrictamente necesario para galería simple
+import 'package:intl/intl.dart';
 
-// Importaciones de nuestra arquitectura
 import 'file_manager_locator.dart';
 import 'file_manager_interface.dart';
 
@@ -107,53 +106,40 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
   }
 
+  // --- MODIFICADO: Seleccionar imagen de Galería y usar nombre de archivo ---
   Future<void> _handleCamera(int? index) async {
+    // Aunque no generamos consecutivo, es buena práctica validar que haya contexto
+    // Pero para solo leer el nombre del archivo, no es estrictamente obligatorio validar la UT.
+    // Sin embargo, mantenemos la consistencia.
+    /*
     if (_utController.text.isEmpty) {
-      _showAlertDialog('Error', 'Debe ingresar la UT antes de tomar una foto.');
+      _showAlertDialog('Error', 'Debe ingresar la UT antes de seleccionar una imagen.');
       return;
     }
+    */
 
-    XFile? photo;
-    // En web usamos galería, en móvil usamos cámara
-    final ImageSource source = kIsWeb ? ImageSource.gallery : ImageSource.camera;
+    try {
+      // Forzamos uso de Galería en todos los casos (Web y Móvil)
+      // Esto simplifica la lógica y evita problemas de permisos de cámara en web
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80, // Opcional, ya que no subimos la imagen, pero reduce uso de RAM al procesar
+      );
 
-    if (kIsWeb) {
-      try {
-        photo = await _picker.pickImage(
-            source: source,
-            imageQuality: 80,
-            maxWidth: 1024
-        );
-      } catch (e) {
-        _showAlertDialog('Error al seleccionar archivo', 'No se pudo cargar la imagen: $e');
+      if (photo != null) {
+        // Obtenemos solo el nombre del archivo (ej: imagen.jpg)
+        final String fileName = photo.name;
+
+        setState(() {
+          if (index == null) {
+            _equipoPrincipalController.text = fileName;
+          } else {
+            _additionalEquipControllers[index].text = fileName;
+          }
+        });
       }
-    } else {
-      var status = await Permission.camera.request();
-      if (status.isGranted) {
-        try {
-          photo = await _picker.pickImage(
-              source: source,
-              imageQuality: 80,
-              maxWidth: 1024
-          );
-        } catch (e) {
-          _showAlertDialog('Error de Cámara', 'No se pudo iniciar la cámara: $e');
-        }
-      } else if (status.isDenied || status.isPermanentlyDenied) {
-        _showAlertDialog('Permiso Denegado',
-            'No se puede usar la cámara sin permisos. Vaya a la configuración de la app para habilitarlos.');
-      }
-    }
-
-    if (photo != null) {
-      final String newFileName = await fileManager.getNextImageName(_utController.text);
-      setState(() {
-        if (index == null) {
-          _equipoPrincipalController.text = newFileName;
-        } else {
-          _additionalEquipControllers[index].text = newFileName;
-        }
-      });
+    } catch (e) {
+      _showAlertDialog('Error', 'No se pudo seleccionar la imagen: $e');
     }
   }
 
@@ -185,11 +171,10 @@ class _EquiposScreenState extends State<EquiposScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0), // Más espacio alrededor
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Título o Encabezado opcional
             const Text(
               "Registro de Equipos",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueGrey),
@@ -200,7 +185,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Fecha (Solo lectura)
                 Expanded(
                   flex: 1,
                   child: Column(
@@ -224,7 +208,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // UT (Entrada)
                 Expanded(
                   flex: 2,
                   child: Column(
@@ -262,7 +245,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                   child: TextField(
                     controller: _equipoPrincipalController,
                     decoration: const InputDecoration(
-                      hintText: 'Nombre o deja vacío para foto',
+                      hintText: 'Nombre o seleccione imagen',
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
@@ -278,7 +261,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                 IconButton.filledTonal(
                   icon: const Icon(Icons.camera_alt, size: 24),
                   onPressed: () => _handleCamera(null),
-                  tooltip: "Tomar foto / Subir imagen",
+                  tooltip: "Seleccionar imagen", // Tooltip actualizado
                 ),
               ],
             ),
@@ -320,6 +303,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                       IconButton.filledTonal(
                         icon: const Icon(Icons.camera_alt),
                         onPressed: () => _handleCamera(index),
+                        tooltip: "Seleccionar imagen",
                       ),
                       IconButton(
                         icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
@@ -331,7 +315,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
               },
             ),
 
-            // Botón para añadir más
             Center(
               child: TextButton.icon(
                 onPressed: _addEquipmentField,
@@ -345,7 +328,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
 
             const SizedBox(height: 32),
 
-            // --- BOTÓN GUARDAR (Grande y destacado) ---
             SizedBox(
               width: double.infinity,
               height: 50,

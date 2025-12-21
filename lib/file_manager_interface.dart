@@ -7,17 +7,20 @@ abstract class FileManagerInterface {
 
   // --- Funciones de Registro ---
 
-  // CAMBIO: Añadido parámetro 'priority'
+  // CAMBIO: Añadido parámetro 'status'
   Future<bool> saveDataToFile(
-      String date, String ut, String point, String description, String priority);
+      String date, String ut, String point, String description, String priority, String status);
 
-  // CAMBIO: Añadido parámetro 'priority' (filtro)
+  // CAMBIO: Añadido parámetro 'status' (filtro)
   Future<List<RegistroRecord>> searchInFile(
-      String startDateStr, String endDateStr, String ut, String plant, String priority);
+      String startDateStr, String endDateStr, String ut, String plant, String priority, String status);
 
   Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete);
 
-  // --- Funciones de Equipos ---
+  // NUEVO: Función para actualizar solo el estatus
+  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus);
+
+  // --- Funciones de Equipos (Sin cambios) ---
 
   Future<bool> saveEquipmentToCsv(
       String date, String ut, String equipment);
