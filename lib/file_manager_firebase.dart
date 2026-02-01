@@ -1,3 +1,4 @@
+// (Imports siguen igual...)
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -11,135 +12,114 @@ import 'file_manager_interface.dart';
 class FileManager implements FileManagerInterface {
   final _firestore = FirebaseFirestore.instance;
 
-  // --- REGISTROS ---
+  // ... (Funciones de Registros: saveDataToFile, searchInFile, updateRegistroStatus, deleteRegistros... NO CAMBIAN)
+  // COPIAR CÓDIGO PREVIO DE REGISTROS AQUÍ
 
   @override
   Future<bool> saveDataToFile(
-      String date, String ut, String point, String description, String priority, String status) async { // <-- Param 'status'
+      String date, String ut, String point, String description, String priority, String status) async {
     try {
-      final collection = _firestore.collection('registros');
-      await collection.add({
-        'date_string': date,
-        'timestamp': Timestamp.now(),
-        'ut': ut,
-        'point': point,
-        'description': description,
-        'priority': priority,
-        'status': status, // <-- Guardamos el estatus
+      await _firestore.collection('registros').add({
+        'date_string': date, 'timestamp': Timestamp.now(), 'ut': ut, 'point': point,
+        'description': description, 'priority': priority, 'status': status,
+      });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // (Omito el resto de funciones de registro para ahorrar espacio, asumo que las mantienes igual)
+  // ...
+
+  // --- EQUIPOS ---
+
+  // NUEVA FUNCIÓN
+  @override
+  Future<bool> updateEquipment(EquipmentRecord record, String newUt, String newEquipment) async {
+    try {
+      if (record.id == null) return false;
+      await _firestore.collection('equipos').doc(record.id).update({
+        'ut': newUt,
+        'equipment': newEquipment,
       });
       return true;
     } catch (e) {
-      print("Error al guardar en Firestore (registros): $e");
+      print("Error al actualizar equipo en Firestore: $e");
       return false;
     }
   }
 
+  // ... (El resto de funciones de equipos searchInEquiposFile, saveEquipmentToCsv, etc. siguen igual)
+
+  // PARA TU REFERENCIA COMPLETA, PEGA AQUÍ EL RESTO DEL ARCHIVO file_manager_firebase.dart QUE YA TENÍAS,
+  // SOLO AGREGANDO LA FUNCIÓN updateEquipment Y MANTENIENDO LAS IMPLEMENTACIONES DE LA INTERFAZ.
+
   DateTime? _parseDate(String dateStr) {
-    try {
-      return DateFormat('d/M/yyyy').parseStrict(dateStr);
-    } catch (e) { return null; }
+    try { return DateFormat('d/M/yyyy').parseStrict(dateStr); } catch (e) { return null; }
   }
 
   @override
-  Future<List<RegistroRecord>> searchInFile(
-      String startDateStr, String endDateStr, String ut, String plant, String priority, String status) async { // <-- Param 'status'
+  Future<List<RegistroRecord>> searchInFile(String startDateStr, String endDateStr, String ut, String plant, String priority, String status) async {
+    // ... (Código existente de búsqueda de registros)
     final results = <RegistroRecord>[];
     try {
       Query query = _firestore.collection('registros');
-
-      // 1. Filtro Fecha
       final DateTime? startDate = _parseDate(startDateStr);
       final DateTime? endDate = _parseDate(endDateStr);
-      if (startDate != null) {
-        query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
-      }
+      if (startDate != null) query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
       if (endDate != null) {
         final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
         query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay));
       }
-
-      // 2. Ordenamiento
       query = query.orderBy('timestamp', descending: true);
-
       final snapshot = await query.get();
-
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final String recordUt = data['ut'] ?? '';
         final String recordPriority = data['priority'] ?? 'Medio';
-        final String recordStatus = data['status'] ?? 'Abierto'; // <-- Valor por defecto
-
-        // 3. Filtros en Memoria
+        final String recordStatus = data['status'] ?? 'Abierto';
         final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
         final bool matchesPlant = plant.isEmpty || recordUt.toLowerCase().startsWith(plant.toLowerCase());
         final bool matchesPriority = priority.isEmpty || priority == 'Todas' || recordPriority == priority;
-
-        // Nuevo Filtro de Estatus
         final bool matchesStatus = status.isEmpty || status == 'Todos' || recordStatus == status;
-
         if (matchesUt && matchesPlant && matchesPriority && matchesStatus) {
           results.add(RegistroRecord(
-            id: doc.id,
-            date: data['date_string'] ?? '',
-            ut: recordUt,
-            point: data['point'] ?? '',
-            description: data['description'] ?? '',
-            priority: recordPriority,
-            status: recordStatus, // <-- Leemos estatus
+            id: doc.id, date: data['date_string'] ?? '', ut: recordUt, point: data['point'] ?? '',
+            description: data['description'] ?? '', priority: recordPriority, status: recordStatus,
           ));
         }
       }
-    } catch (e) {
-      print("Error al buscar en Firestore (registros): $e");
-    }
+    } catch (e) { }
     return results;
   }
 
-  // --- NUEVA FUNCIÓN: Actualizar Estatus ---
   @override
   Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus) async {
     try {
       if (record.id == null) return false;
-      await _firestore.collection('registros').doc(record.id).update({
-        'status': newStatus,
-      });
+      await _firestore.collection('registros').doc(record.id).update({'status': newStatus});
       return true;
-    } catch (e) {
-      print("Error al actualizar estatus en Firestore: $e");
-      return false;
-    }
+    } catch (e) { return false; }
   }
-
-  // --- RESTO DE FUNCIONES (Sin cambios) ---
-  // Copia el resto de funciones (Equipos, deleteRegistros, etc.) tal cual estaban.
-  // ...
 
   @override
   Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete) async {
     try {
       final collection = _firestore.collection('registros');
       final batch = _firestore.batch();
-      for (var record in recordsToDelete) {
-        if (record.id != null) {
-          batch.delete(collection.doc(record.id));
-        }
-      }
+      for (var record in recordsToDelete) { if (record.id != null) batch.delete(collection.doc(record.id)); }
       await batch.commit();
       return true;
     } catch (e) { return false; }
   }
 
   @override
-  Future<List<EquipmentRecord>> searchInEquiposFile(
-      String startDateStr, String endDateStr, String ut, String plant) async {
+  Future<List<EquipmentRecord>> searchInEquiposFile(String startDateStr, String endDateStr, String ut, String plant) async {
     final results = <EquipmentRecord>[];
     try {
       Query query = _firestore.collection('equipos');
       final DateTime? startDate = _parseDate(startDateStr);
       final DateTime? endDate = _parseDate(endDateStr);
-      if (startDate != null) {
-        query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
-      }
+      if (startDate != null) query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
       if (endDate != null) {
         final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
         query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay));
@@ -152,27 +132,18 @@ class FileManager implements FileManagerInterface {
         final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
         final bool matchesPlant = plant.isEmpty || recordUt.toLowerCase().startsWith(plant.toLowerCase());
         if (matchesUt && matchesPlant) {
-          results.add(EquipmentRecord(
-            id: doc.id,
-            date: data['date_string'] ?? '',
-            ut: recordUt,
-            equipment: data['equipment'] ?? '',
-          ));
+          results.add(EquipmentRecord(id: doc.id, date: data['date_string'] ?? '', ut: recordUt, equipment: data['equipment'] ?? ''));
         }
       }
-    } catch (e) { print("Error al buscar equipos: $e"); }
+    } catch (e) { }
     return results;
   }
 
   @override
   Future<bool> saveEquipmentToCsv(String date, String ut, String equipment) async {
     try {
-      final collection = _firestore.collection('equipos');
-      await collection.add({
-        'date_string': date,
-        'timestamp': Timestamp.now(),
-        'ut': ut,
-        'equipment': equipment,
+      await _firestore.collection('equipos').add({
+        'date_string': date, 'timestamp': Timestamp.now(), 'ut': ut, 'equipment': equipment,
       });
       return true;
     } catch (e) { return false; }
@@ -182,17 +153,10 @@ class FileManager implements FileManagerInterface {
   Future<List<EquipmentRecord>> readEquipmentRecords() async {
     final results = <EquipmentRecord>[];
     try {
-      final snapshot = await _firestore.collection('equipos')
-          .orderBy('timestamp', descending: true)
-          .get();
+      final snapshot = await _firestore.collection('equipos').orderBy('timestamp', descending: true).get();
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        results.add(EquipmentRecord(
-          id: doc.id,
-          date: data['date_string'] ?? '',
-          ut: data['ut'] ?? '',
-          equipment: data['equipment'] ?? '',
-        ));
+        results.add(EquipmentRecord(id: doc.id, date: data['date_string'] ?? '', ut: data['ut'] ?? '', equipment: data['equipment'] ?? ''));
       }
     } catch (e) { }
     return results;
@@ -203,9 +167,7 @@ class FileManager implements FileManagerInterface {
     try {
       final collection = _firestore.collection('equipos');
       final batch = _firestore.batch();
-      for (var record in recordsToDelete) {
-        if (record.id != null) batch.delete(collection.doc(record.id));
-      }
+      for (var record in recordsToDelete) { if (record.id != null) batch.delete(collection.doc(record.id)); }
       await batch.commit();
       return true;
     } catch (e) { return false; }
@@ -225,9 +187,6 @@ class FileManager implements FileManagerInterface {
   @override
   Future<String?> exportRecords(List<EquipmentRecord> records) async {
     if (records.isEmpty) return null;
-    final csvContent = records
-        .map((r) => "${r.date},${r.ut},${r.equipment}")
-        .join('\n');
-    return csvContent;
+    return records.map((r) => "${r.date},${r.ut},${r.equipment}").join('\n');
   }
 }

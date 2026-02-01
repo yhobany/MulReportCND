@@ -91,7 +91,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  // --- Función para cambiar Estatus (con actualización local) ---
+  // --- Función para cambiar Estatus de REGISTRO ---
   void _showEditStatusDialog(RegistroRecord item) {
     String newStatus = item.status;
 
@@ -155,6 +155,101 @@ class _ReportScreenState extends State<ReportScreen> {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Error al actualizar estatus'))
+                  );
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- NUEVA FUNCIÓN: Editar EQUIPO ---
+  void _showEditEquipmentDialog(EquipmentRecord item) {
+    final TextEditingController utEditController = TextEditingController(text: item.ut);
+    final TextEditingController equipEditController = TextEditingController(text: item.equipment);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Editar Equipo'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Corrija los datos necesarios:"),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: utEditController,
+                  decoration: const InputDecoration(labelText: 'UT', border: OutlineInputBorder()),
+                  onChanged: (text) {
+                    utEditController.value = utEditController.value.copyWith(
+                      text: text.toUpperCase(),
+                      selection: TextSelection.collapsed(offset: text.length),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: equipEditController,
+                  decoration: const InputDecoration(labelText: 'Equipo / Imagen', border: OutlineInputBorder()),
+                  onChanged: (text) {
+                    equipEditController.value = equipEditController.value.copyWith(
+                      text: text.toUpperCase(),
+                      selection: TextSelection.collapsed(offset: text.length),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newUt = utEditController.text.trim();
+                final newEquip = equipEditController.text.trim();
+
+                if (newUt.isEmpty || newEquip.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Los campos no pueden estar vacíos'))
+                  );
+                  return;
+                }
+
+                Navigator.pop(context); // Cerrar diálogo
+
+                // 1. Actualizar en Backend
+                bool success = await fileManager.updateEquipment(item, newUt, newEquip);
+
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Equipo actualizado correctamente'))
+                  );
+
+                  // 2. Actualización Local Inmediata
+                  setState(() {
+                    int index = _results.indexOf(item);
+                    if (index != -1) {
+                      final oldItem = _results[index] as EquipmentRecord;
+                      final newItem = EquipmentRecord(
+                        id: oldItem.id,
+                        date: oldItem.date, // Mantenemos fecha original
+                        ut: newUt,
+                        equipment: newEquip,
+                      );
+                      _results[index] = newItem;
+                    }
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error al actualizar el equipo'))
                   );
                 }
               },
@@ -500,6 +595,13 @@ class _ReportScreenState extends State<ReportScreen> {
                     } else if (item is EquipmentRecord) {
                       title = "${item.ut} (${item.date})";
                       subtitleWidget = Text(item.equipment);
+
+                      // NUEVO: Botón de Editar Equipo
+                      trailingWidget = IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => _showEditEquipmentDialog(item),
+                        tooltip: "Editar Equipo",
+                      );
                     }
 
                     return Card(

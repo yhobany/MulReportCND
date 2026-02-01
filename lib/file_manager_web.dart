@@ -1,3 +1,4 @@
+// (Imports siguen igual...)
 import 'dart:html' as html;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,36 +11,68 @@ const String _equiposKey = 'equipos_csv_data';
 
 class FileManager implements FileManagerInterface {
 
+  // ... (Tus funciones de Registros... MANTENER IGUAL)
+
+  // --- EQUIPOS: NUEVA FUNCIÓN ---
   @override
-  Future<bool> saveDataToFile(
-      String date, String ut, String point, String description, String priority, String status) async { // <-- Param 'status'
+  Future<bool> updateEquipment(EquipmentRecord oldRecord, String newUt, String newEquipment) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> lines = prefs.getStringList(_equiposKey) ?? [];
+      final newLines = <String>[];
+      bool found = false;
+
+      // Cadena original a buscar
+      final searchString = "${oldRecord.date},${oldRecord.ut},${oldRecord.equipment}";
+
+      for (final line in lines) {
+        if (line.trim() == searchString.trim() && !found) {
+          // Reemplazamos
+          newLines.add("${oldRecord.date},$newUt,$newEquipment");
+          found = true;
+        } else {
+          newLines.add(line);
+        }
+      }
+
+      if (found) {
+        await prefs.setStringList(_equiposKey, newLines);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("Error al actualizar equipo web: $e");
+      return false;
+    }
+  }
+
+  // ... (Copiar el resto de las funciones searchInEquiposFile, saveEquipmentToCsv, etc. para mantener el archivo válido)
+
+  // -- A CONTINUACIÓN COPIAR EL RESTO DE MÉTODOS OBLIGATORIOS --
+
+  DateTime? _parseDate(String dateStr) {
+    try { return DateFormat('d/M/yyyy').parseStrict(dateStr); } catch (e) { return null; }
+  }
+
+  @override
+  Future<bool> saveDataToFile(String date, String ut, String point, String description, String priority, String status) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final List<String> records = prefs.getStringList(_registroKey) ?? [];
       records.add("$date,$ut,$point,$description,$priority,$status");
       await prefs.setStringList(_registroKey, records);
       return true;
-    } catch (e) {
-      print("Error al guardar en SharedPreferences (web): $e");
-      return false;
-    }
-  }
-
-  DateTime? _parseDate(String dateStr) {
-    try {
-      return DateFormat('d/M/yyyy').parseStrict(dateStr);
-    } catch (e) { return null; }
+    } catch (e) { return false; }
   }
 
   @override
-  Future<List<RegistroRecord>> searchInFile(
-      String startDateStr, String endDateStr, String ut, String plant, String priority, String status) async { // <-- Param 'status'
+  Future<List<RegistroRecord>> searchInFile(String startDateStr, String endDateStr, String ut, String plant, String priority, String status) async {
+    // (Implementación existente...)
     final results = <RegistroRecord>[];
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_registroKey) ?? [];
     final DateTime? startDate = _parseDate(startDateStr);
     final DateTime? endDate = _parseDate(endDateStr);
-
     try {
       for (final line in lines) {
         if (line.isEmpty) continue;
@@ -48,32 +81,19 @@ class FileManager implements FileManagerInterface {
           final String recordDateStr = parts[0];
           final String recordUt = parts[1];
           final String recordPriority = parts.length >= 5 ? parts[4] : 'Medio';
-          final String recordStatus = parts.length >= 6 ? parts[5] : 'Abierto'; // <-- Compatibilidad
-
+          final String recordStatus = parts.length >= 6 ? parts[5] : 'Abierto';
           bool matchesDate = true;
           final DateTime? recordDate = _parseDate(recordDateStr);
           if (recordDate != null) {
             if (startDate != null && recordDate.isBefore(startDate)) matchesDate = false;
             if (endDate != null && recordDate.isAfter(endDate)) matchesDate = false;
-          } else if (startDate != null || endDate != null) {
-            matchesDate = false;
-          }
-
+          } else if (startDate != null || endDate != null) { matchesDate = false; }
           final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
           final bool matchesPlant = plant.isEmpty || recordUt.toLowerCase().startsWith(plant.toLowerCase());
           final bool matchesPriority = priority.isEmpty || priority == 'Todas' || recordPriority == priority;
-          final bool matchesStatus = status.isEmpty || status == 'Todos' || recordStatus == status; // <-- Filtro
-
+          final bool matchesStatus = status.isEmpty || status == 'Todos' || recordStatus == status;
           if (matchesDate && matchesUt && matchesPlant && matchesPriority && matchesStatus) {
-            results.add(RegistroRecord(
-              id: null,
-              date: recordDateStr,
-              ut: recordUt,
-              point: parts[2],
-              description: parts[3],
-              priority: recordPriority,
-              status: recordStatus,
-            ));
+            results.add(RegistroRecord(id: null, date: recordDateStr, ut: recordUt, point: parts[2], description: parts[3], priority: recordPriority, status: recordStatus));
           }
         }
       }
@@ -82,57 +102,16 @@ class FileManager implements FileManagerInterface {
         final dateB = _parseDate(b.date) ?? DateTime(1900);
         return dateB.compareTo(dateA);
       });
-    } catch (e) {
-      print("Error al buscar en SharedPreferences (web): $e");
-    }
+    } catch (e) { }
     return results;
   }
 
-  // --- NUEVA FUNCIÓN: Actualizar Estatus ---
-  @override
-  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<String> lines = prefs.getStringList(_registroKey) ?? [];
-      final newLines = <String>[];
-      bool found = false;
-
-      for (final line in lines) {
-        if (line.isEmpty) continue;
-        final parts = line.split(',');
-        if (parts.length >= 4) {
-          final p = parts.length >= 5 ? parts[4] : 'Medio';
-          final s = parts.length >= 6 ? parts[5] : 'Abierto';
-          final currentRecord = RegistroRecord(
-              id: null, date: parts[0], ut: parts[1], point: parts[2], description: parts[3], priority: p, status: s
-          );
-
-          if (currentRecord == record) {
-            final newLine = "${record.date},${record.ut},${record.point},${record.description},${record.priority},$newStatus";
-            newLines.add(newLine);
-            found = true;
-          } else {
-            newLines.add(line);
-          }
-        }
-      }
-
-      if (found) {
-        await prefs.setStringList(_registroKey, newLines);
-        return true;
-      }
-      return false;
-    } catch (e) { return false; }
-  }
-
-  // --- RESTO DE FUNCIONES (Sin cambios) ---
-
   @override
   Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete) async {
+    // (Implementación existente...)
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_registroKey) ?? [];
     final recordsToDeleteSet = recordsToDelete.toSet();
-
     try {
       final linesToKeep = <String>[];
       for (final line in lines) {
@@ -142,9 +121,7 @@ class FileManager implements FileManagerInterface {
           final p = parts.length >= 5 ? parts[4] : 'Medio';
           final s = parts.length >= 6 ? parts[5] : 'Abierto';
           final rec = RegistroRecord(id: null, date: parts[0], ut: parts[1], point: parts[2], description: parts[3], priority: p, status: s);
-          if (!recordsToDeleteSet.contains(rec)) {
-            linesToKeep.add(line);
-          }
+          if (!recordsToDeleteSet.contains(rec)) linesToKeep.add(line);
         }
       }
       await prefs.setStringList(_registroKey, linesToKeep);
@@ -153,13 +130,43 @@ class FileManager implements FileManagerInterface {
   }
 
   @override
+  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus) async {
+    // (Implementación existente...)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> lines = prefs.getStringList(_registroKey) ?? [];
+      final newLines = <String>[];
+      bool found = false;
+      for (final line in lines) {
+        if (line.isEmpty) continue;
+        final parts = line.split(',');
+        if (parts.length >= 4) {
+          final p = parts.length >= 5 ? parts[4] : 'Medio';
+          final s = parts.length >= 6 ? parts[5] : 'Abierto';
+          final currentRecord = RegistroRecord(id: null, date: parts[0], ut: parts[1], point: parts[2], description: parts[3], priority: p, status: s);
+          if (currentRecord == record) {
+            final newLine = "${record.date},${record.ut},${record.point},${record.description},${record.priority},$newStatus";
+            newLines.add(newLine);
+            found = true;
+          } else { newLines.add(line); }
+        }
+      }
+      if (found) {
+        await prefs.setStringList(_registroKey, newLines);
+        return true;
+      }
+      return false;
+    } catch (e) { return false; }
+  }
+
+  @override
   Future<List<EquipmentRecord>> searchInEquiposFile(String startDateStr, String endDateStr, String ut, String plant) async {
+    // (Implementación existente...)
     final results = <EquipmentRecord>[];
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_equiposKey) ?? [];
     final DateTime? startDate = _parseDate(startDateStr);
     final DateTime? endDate = _parseDate(endDateStr);
-
     try {
       for (final line in lines) {
         if (line.isEmpty) continue;
@@ -201,6 +208,7 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<List<EquipmentRecord>> readEquipmentRecords() async {
+    // (Implementación existente...)
     final results = <EquipmentRecord>[];
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_equiposKey) ?? [];
@@ -208,9 +216,7 @@ class FileManager implements FileManagerInterface {
       for (final line in lines) {
         if (line.isEmpty) continue;
         final parts = line.split(',');
-        if (parts.length >= 3) {
-          results.add(EquipmentRecord(id: null, date: parts[0], ut: parts[1], equipment: parts[2]));
-        }
+        if (parts.length >= 3) results.add(EquipmentRecord(id: null, date: parts[0], ut: parts[1], equipment: parts[2]));
       }
     } catch (e) { }
     results.sort((a, b) {
@@ -223,15 +229,14 @@ class FileManager implements FileManagerInterface {
 
   @override
   Future<bool> deleteEquipmentRecords(List<EquipmentRecord> recordsToDelete) async {
+    // (Implementación existente...)
     final prefs = await SharedPreferences.getInstance();
     final List<String> lines = prefs.getStringList(_equiposKey) ?? [];
     final recordsToDeleteSet = recordsToDelete.map((r) => "${r.date},${r.ut},${r.equipment}").toSet();
     try {
       final linesToKeep = <String>[];
       for (final line in lines) {
-        if (line.isNotEmpty && !recordsToDeleteSet.contains(line)) {
-          linesToKeep.add(line);
-        }
+        if (line.isNotEmpty && !recordsToDeleteSet.contains(line)) linesToKeep.add(line);
       }
       await prefs.setStringList(_equiposKey, linesToKeep);
       return true;
@@ -252,7 +257,6 @@ class FileManager implements FileManagerInterface {
   @override
   Future<String?> exportRecords(List<EquipmentRecord> records) async {
     if (records.isEmpty) return null;
-    final csvContent = records.map((r) => "${r.date},${r.ut},${r.equipment}").join('\n');
-    return csvContent;
+    return records.map((r) => "${r.date},${r.ut},${r.equipment}").join('\n');
   }
 }
