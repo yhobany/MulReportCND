@@ -1,3 +1,5 @@
+// lib/file_manager_interface.dart
+
 import 'equipment_record.dart';
 import 'registro_record.dart';
 
@@ -12,7 +14,7 @@ abstract class FileManagerInterface {
 
   Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete);
 
-  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus);
+  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus, String actionNote);
 
   // --- Funciones de Equipos ---
 
@@ -23,9 +25,7 @@ abstract class FileManagerInterface {
 
   Future<bool> deleteEquipmentRecords(List<EquipmentRecord> recordsToDelete);
 
-  // --- NUEVA FUNCIÓN ---
-  Future<bool> updateEquipment(EquipmentRecord oldRecord, String newUt, String newEquipment);
-  // ---------------------
+  Future<bool> updateEquipment(EquipmentRecord oldRecord, String newUt, String newEquipment, String newDate);
 
   Future<String> getNextImageName(String ut);
 

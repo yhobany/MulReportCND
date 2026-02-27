@@ -1,4 +1,5 @@
-// (Imports siguen igual...)
+// lib/file_manager_firebase.dart
+
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -12,8 +13,9 @@ import 'file_manager_interface.dart';
 class FileManager implements FileManagerInterface {
   final _firestore = FirebaseFirestore.instance;
 
-  // ... (Funciones de Registros: saveDataToFile, searchInFile, updateRegistroStatus, deleteRegistros... NO CAMBIAN)
-  // COPIAR CÓDIGO PREVIO DE REGISTROS AQUÍ
+  DateTime? _parseDate(String dateStr) {
+    try { return DateFormat('d/M/yyyy').parseStrict(dateStr); } catch (e) { return null; }
+  }
 
   @override
   Future<bool> saveDataToFile(
@@ -21,45 +23,14 @@ class FileManager implements FileManagerInterface {
     try {
       await _firestore.collection('registros').add({
         'date_string': date, 'timestamp': Timestamp.now(), 'ut': ut, 'point': point,
-        'description': description, 'priority': priority, 'status': status,
+        'description': description, 'priority': priority, 'status': status, 'actionNote': ''
       });
       return true;
     } catch (e) { return false; }
   }
 
-  // (Omito el resto de funciones de registro para ahorrar espacio, asumo que las mantienes igual)
-  // ...
-
-  // --- EQUIPOS ---
-
-  // NUEVA FUNCIÓN
-  @override
-  Future<bool> updateEquipment(EquipmentRecord record, String newUt, String newEquipment) async {
-    try {
-      if (record.id == null) return false;
-      await _firestore.collection('equipos').doc(record.id).update({
-        'ut': newUt,
-        'equipment': newEquipment,
-      });
-      return true;
-    } catch (e) {
-      print("Error al actualizar equipo en Firestore: $e");
-      return false;
-    }
-  }
-
-  // ... (El resto de funciones de equipos searchInEquiposFile, saveEquipmentToCsv, etc. siguen igual)
-
-  // PARA TU REFERENCIA COMPLETA, PEGA AQUÍ EL RESTO DEL ARCHIVO file_manager_firebase.dart QUE YA TENÍAS,
-  // SOLO AGREGANDO LA FUNCIÓN updateEquipment Y MANTENIENDO LAS IMPLEMENTACIONES DE LA INTERFAZ.
-
-  DateTime? _parseDate(String dateStr) {
-    try { return DateFormat('d/M/yyyy').parseStrict(dateStr); } catch (e) { return null; }
-  }
-
   @override
   Future<List<RegistroRecord>> searchInFile(String startDateStr, String endDateStr, String ut, String plant, String priority, String status) async {
-    // ... (Código existente de búsqueda de registros)
     final results = <RegistroRecord>[];
     try {
       Query query = _firestore.collection('registros');
@@ -77,6 +48,8 @@ class FileManager implements FileManagerInterface {
         final String recordUt = data['ut'] ?? '';
         final String recordPriority = data['priority'] ?? 'Medio';
         final String recordStatus = data['status'] ?? 'Abierto';
+        final String recordNote = data['actionNote'] ?? '';
+
         final bool matchesUt = ut.isEmpty || recordUt.toLowerCase().contains(ut.toLowerCase());
         final bool matchesPlant = plant.isEmpty || recordUt.toLowerCase().startsWith(plant.toLowerCase());
         final bool matchesPriority = priority.isEmpty || priority == 'Todas' || recordPriority == priority;
@@ -84,7 +57,7 @@ class FileManager implements FileManagerInterface {
         if (matchesUt && matchesPlant && matchesPriority && matchesStatus) {
           results.add(RegistroRecord(
             id: doc.id, date: data['date_string'] ?? '', ut: recordUt, point: data['point'] ?? '',
-            description: data['description'] ?? '', priority: recordPriority, status: recordStatus,
+            description: data['description'] ?? '', priority: recordPriority, status: recordStatus, actionNote: recordNote,
           ));
         }
       }
@@ -93,10 +66,13 @@ class FileManager implements FileManagerInterface {
   }
 
   @override
-  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus) async {
+  Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus, String actionNote) async {
     try {
       if (record.id == null) return false;
-      await _firestore.collection('registros').doc(record.id).update({'status': newStatus});
+      await _firestore.collection('registros').doc(record.id).update({
+        'status': newStatus,
+        'actionNote': actionNote,
+      });
       return true;
     } catch (e) { return false; }
   }
@@ -110,6 +86,25 @@ class FileManager implements FileManagerInterface {
       await batch.commit();
       return true;
     } catch (e) { return false; }
+  }
+
+  // --- EQUIPOS ---
+
+  @override
+  Future<bool> updateEquipment(EquipmentRecord record, String newUt, String newEquipment, String newDate) async {
+    try {
+      if (record.id == null) return false;
+      await _firestore.collection('equipos').doc(record.id).update({
+        'ut': newUt,
+        'equipment': newEquipment,
+        'date_string': newDate,
+        'timestamp': Timestamp.now(), // Actualiza la posición en la lista
+      });
+      return true;
+    } catch (e) {
+      print("Error al actualizar equipo en Firestore: $e");
+      return false;
+    }
   }
 
   @override

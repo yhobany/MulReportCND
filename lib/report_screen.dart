@@ -35,11 +35,9 @@ class _ReportScreenState extends State<ReportScreen> {
   String _searchType = 'Registros';
   final List<String> _searchOptions = ['Registros', 'Equipos'];
 
-  // Filtro de Prioridad
   String _searchPriority = 'Todas';
   final List<String> _priorityOptions = ['Todas', 'Alto', 'Medio', 'Bajo'];
 
-  // Filtro de Estatus
   String _searchStatus = 'Todos';
   final List<String> _statusFilterOptions = ['Todos', 'Abierto', 'En Proceso', 'Culminado'];
   final List<String> _statusEditOptions = ['Abierto', 'En Proceso', 'Culminado'];
@@ -62,7 +60,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Future<void> _performSearch() async {
     FocusScope.of(context).unfocus();
-    // No limpiamos selección para mejor UX al editar
 
     if (_searchType == 'Registros') {
       final results = await fileManager.searchInFile(
@@ -94,79 +91,96 @@ class _ReportScreenState extends State<ReportScreen> {
   // --- Función para cambiar Estatus de REGISTRO ---
   void _showEditStatusDialog(RegistroRecord item) {
     String newStatus = item.status;
+    TextEditingController noteController = TextEditingController(text: item.actionNote);
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Actualizar Estatus'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("UT: ${item.ut}", style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text("Seleccione el nuevo estatus:"),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: newStatus,
-                items: _statusEditOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                onChanged: (val) {
-                  if (val != null) newStatus = val;
-                },
-                decoration: const InputDecoration(border: OutlineInputBorder()),
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Actualizar Estatus'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("UT: ${item.ut}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  const Text("Seleccione el nuevo estatus:"),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: newStatus,
+                    items: _statusEditOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (val) {
+                      setStateDialog(() {
+                        if (val != null) newStatus = val;
+                      });
+                    },
+                    decoration: const InputDecoration(border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Mostrar cuadro de notas si es 'En Proceso' o 'Culminado'
+                  if (newStatus == 'En Proceso' || newStatus == 'Culminado')
+                    TextField(
+                      controller: noteController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nota de la acción (Opcional)',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context); // Cerrar diálogo
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context); // Cerrar diálogo
 
-                // 1. Actualizar en Backend
-                bool success = await fileManager.updateRegistroStatus(item, newStatus);
+                    final noteText = noteController.text.trim();
 
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Estatus actualizado a: $newStatus'))
-                  );
+                    // 1. Actualizar en Backend
+                    bool success = await fileManager.updateRegistroStatus(item, newStatus, noteText);
 
-                  // 2. Actualización Local Inmediata
-                  setState(() {
-                    int index = _results.indexOf(item);
-                    if (index != -1) {
-                      final oldItem = _results[index] as RegistroRecord;
-                      final newItem = RegistroRecord(
-                        id: oldItem.id,
-                        date: oldItem.date,
-                        ut: oldItem.ut,
-                        point: oldItem.point,
-                        description: oldItem.description,
-                        priority: oldItem.priority,
-                        status: newStatus,
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Estatus actualizado a: $newStatus'))
                       );
-                      _results[index] = newItem;
+
+                      // 2. Actualización Local Inmediata
+                      setState(() {
+                        int index = _results.indexOf(item);
+                        if (index != -1) {
+                          final oldItem = _results[index] as RegistroRecord;
+                          final newItem = RegistroRecord(
+                            id: oldItem.id, date: oldItem.date, ut: oldItem.ut,
+                            point: oldItem.point, description: oldItem.description,
+                            priority: oldItem.priority, status: newStatus, actionNote: noteText,
+                          );
+                          _results[index] = newItem;
+                        }
+                      });
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Error al actualizar estatus'))
+                      );
                     }
-                  });
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error al actualizar estatus'))
-                  );
-                }
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
   }
 
-  // --- NUEVA FUNCIÓN: Editar EQUIPO ---
+  // --- Función: Editar EQUIPO ---
   void _showEditEquipmentDialog(EquipmentRecord item) {
     final TextEditingController utEditController = TextEditingController(text: item.ut);
     final TextEditingController equipEditController = TextEditingController(text: item.equipment);
@@ -225,8 +239,11 @@ class _ReportScreenState extends State<ReportScreen> {
 
                 Navigator.pop(context); // Cerrar diálogo
 
+                // Generar la fecha actual al momento de guardar
+                final String newDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
+
                 // 1. Actualizar en Backend
-                bool success = await fileManager.updateEquipment(item, newUt, newEquip);
+                bool success = await fileManager.updateEquipment(item, newUt, newEquip, newDate);
 
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -240,7 +257,7 @@ class _ReportScreenState extends State<ReportScreen> {
                       final oldItem = _results[index] as EquipmentRecord;
                       final newItem = EquipmentRecord(
                         id: oldItem.id,
-                        date: oldItem.date, // Mantenemos fecha original
+                        date: newDate,
                         ut: newUt,
                         equipment: newEquip,
                       );
@@ -585,6 +602,32 @@ class _ReportScreenState extends State<ReportScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text("${item.point}\n${item.description}"),
+
+                          // --- NUEVO: Mostrar la Nota si existe ---
+                          if (item.actionNote.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.blue.shade200),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.notes, size: 16, color: Colors.blue.shade700),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      "Nota: ${item.actionNote}",
+                                      style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue.shade900, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          ],
                         ],
                       );
                       trailingWidget = IconButton(
@@ -596,7 +639,6 @@ class _ReportScreenState extends State<ReportScreen> {
                       title = "${item.ut} (${item.date})";
                       subtitleWidget = Text(item.equipment);
 
-                      // NUEVO: Botón de Editar Equipo
                       trailingWidget = IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: () => _showEditEquipmentDialog(item),

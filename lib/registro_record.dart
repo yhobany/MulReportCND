@@ -7,7 +7,8 @@ class RegistroRecord {
   final String point;
   final String description;
   final String priority;
-  final String status; // <-- NUEVO CAMPO
+  final String status;
+  final String actionNote; // <-- NUEVO CAMPO
 
   RegistroRecord({
     this.id,
@@ -16,7 +17,8 @@ class RegistroRecord {
     required this.point,
     required this.description,
     this.priority = 'Medio',
-    this.status = 'Abierto', // <-- Valor por defecto
+    this.status = 'Abierto',
+    this.actionNote = '', // <-- Valor por defecto
   });
 
   @override
@@ -29,9 +31,10 @@ class RegistroRecord {
         point == other.point &&
         description == other.description &&
         priority == other.priority &&
-        status == other.status; // <-- Incluir en comparación
+        status == other.status &&
+        actionNote == other.actionNote; // <-- Incluir en comparación
   }
 
   @override
-  int get hashCode => id?.hashCode ?? Object.hash(date, ut, point, description, priority, status);
+  int get hashCode => id?.hashCode ?? Object.hash(date, ut, point, description, priority, status, actionNote);
 }
