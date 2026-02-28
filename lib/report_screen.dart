@@ -88,7 +88,6 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  // --- Función para cambiar Estatus de REGISTRO ---
   void _showEditStatusDialog(RegistroRecord item) {
     String newStatus = item.status;
     TextEditingController noteController = TextEditingController(text: item.actionNote);
@@ -120,7 +119,6 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Mostrar cuadro de notas si es 'En Proceso' o 'Culminado'
                   if (newStatus == 'En Proceso' || newStatus == 'Culminado')
                     TextField(
                       controller: noteController,
@@ -139,11 +137,9 @@ class _ReportScreenState extends State<ReportScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    Navigator.pop(context); // Cerrar diálogo
+                    Navigator.pop(context);
 
                     final noteText = noteController.text.trim();
-
-                    // 1. Actualizar en Backend
                     bool success = await fileManager.updateRegistroStatus(item, newStatus, noteText);
 
                     if (success) {
@@ -151,7 +147,6 @@ class _ReportScreenState extends State<ReportScreen> {
                           SnackBar(content: Text('Estatus actualizado a: $newStatus'))
                       );
 
-                      // 2. Actualización Local Inmediata
                       setState(() {
                         int index = _results.indexOf(item);
                         if (index != -1) {
@@ -180,7 +175,6 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // --- Función: Editar EQUIPO ---
   void _showEditEquipmentDialog(EquipmentRecord item) {
     final TextEditingController utEditController = TextEditingController(text: item.ut);
     final TextEditingController equipEditController = TextEditingController(text: item.equipment);
@@ -237,12 +231,9 @@ class _ReportScreenState extends State<ReportScreen> {
                   return;
                 }
 
-                Navigator.pop(context); // Cerrar diálogo
+                Navigator.pop(context);
 
-                // Generar la fecha actual al momento de guardar
                 final String newDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
-
-                // 1. Actualizar en Backend
                 bool success = await fileManager.updateEquipment(item, newUt, newEquip, newDate);
 
                 if (success) {
@@ -250,7 +241,6 @@ class _ReportScreenState extends State<ReportScreen> {
                       const SnackBar(content: Text('Equipo actualizado correctamente'))
                   );
 
-                  // 2. Actualización Local Inmediata
                   setState(() {
                     int index = _results.indexOf(item);
                     if (index != -1) {
@@ -426,137 +416,170 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // --- CABECERA ---
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    value: _searchType,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    items: _searchOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                    onChanged: (v) => setState(() { _searchType = v!; _results = []; _selectedItems.clear(); }),
-                  ),
-                ),
-
-                if (_searchType == 'Registros') ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: DropdownButtonFormField<String>(
-                      value: _searchPriority,
-                      decoration: const InputDecoration(
-                        labelText: 'Prioridad',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      body: CustomScrollView(
+        slivers: [
+          // --- SECCIÓN SUPERIOR ESTÁTICA/FILTROS ---
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<String>(
+                          value: _searchType,
+                          decoration: const InputDecoration(
+                            labelText: 'Tipo',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          items: _searchOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                          onChanged: (v) => setState(() { _searchType = v!; _results = []; _selectedItems.clear(); }),
+                        ),
                       ),
-                      items: _priorityOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                      onChanged: (v) => setState(() { _searchPriority = v!; }),
-                    ),
-                  ),
-                ],
-
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  icon: Icon(_areFiltersVisible ? Icons.expand_less : Icons.filter_list),
-                  tooltip: _areFiltersVisible ? "Ocultar Filtros" : "Mostrar Filtros",
-                  onPressed: () => setState(() => _areFiltersVisible = !_areFiltersVisible),
-                ),
-              ],
-            ),
-
-            // --- ÁREA COLAPSABLE DE FILTROS ---
-            AnimatedSize(
-              duration: const Duration(milliseconds: 300),
-              child: Container(
-                height: _areFiltersVisible ? null : 0,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _startDateController, readOnly: true, onTap: () => _selectDate(context, _startDateController), decoration: const InputDecoration(labelText: 'Fecha inicio', border: OutlineInputBorder(), suffixIcon: Icon(Icons.date_range)))),
-                        const SizedBox(width: 16),
-                        Expanded(child: TextField(controller: _endDateController, readOnly: true, onTap: () => _selectDate(context, _endDateController), decoration: const InputDecoration(labelText: 'Fecha fin', border: OutlineInputBorder(), suffixIcon: Icon(Icons.date_range)))),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _plantController, readOnly: true, onTap: _showPlantDialog, decoration: const InputDecoration(labelText: 'Planta', border: OutlineInputBorder(), suffixIcon: Icon(Icons.arrow_drop_down)))),
-                        const SizedBox(width: 16),
-                        Expanded(child: TextField(controller: _utController, decoration: const InputDecoration(labelText: 'UT', border: OutlineInputBorder()), onChanged: (t) => _utController.value = _utController.value.copyWith(text: t.toUpperCase(), selection: TextSelection.collapsed(offset: t.length)))),
-                      ],
-                    ),
-
-                    if (_searchType == 'Registros') ...[
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _searchStatus,
-                              decoration: const InputDecoration(
-                                labelText: 'Estatus del Registro',
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              ),
-                              items: _statusFilterOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                              onChanged: (v) => setState(() { _searchStatus = v!; }),
+                      if (_searchType == 'Registros') ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: DropdownButtonFormField<String>(
+                            value: _searchPriority,
+                            decoration: const InputDecoration(
+                              labelText: 'Prioridad',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
+                            items: _priorityOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                            onChanged: (v) => setState(() { _searchPriority = v!; }),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        icon: Icon(_areFiltersVisible ? Icons.expand_less : Icons.filter_list),
+                        tooltip: _areFiltersVisible ? "Ocultar Filtros" : "Mostrar Filtros",
+                        onPressed: () => setState(() => _areFiltersVisible = !_areFiltersVisible),
+                      ),
+                    ],
+                  ),
+
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 300),
+                    child: Container(
+                      height: _areFiltersVisible ? null : 0,
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(child: TextField(controller: _startDateController, readOnly: true, onTap: () => _selectDate(context, _startDateController), decoration: const InputDecoration(labelText: 'Fecha inicio', border: OutlineInputBorder(), suffixIcon: Icon(Icons.date_range)))),
+                              const SizedBox(width: 16),
+                              Expanded(child: TextField(controller: _endDateController, readOnly: true, onTap: () => _selectDate(context, _endDateController), decoration: const InputDecoration(labelText: 'Fecha fin', border: OutlineInputBorder(), suffixIcon: Icon(Icons.date_range)))),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(child: TextField(controller: _plantController, readOnly: true, onTap: _showPlantDialog, decoration: const InputDecoration(labelText: 'Planta', border: OutlineInputBorder(), suffixIcon: Icon(Icons.arrow_drop_down)))),
+                              const SizedBox(width: 16),
+                              Expanded(child: TextField(controller: _utController, decoration: const InputDecoration(labelText: 'UT', border: OutlineInputBorder()), onChanged: (t) => _utController.value = _utController.value.copyWith(text: t.toUpperCase(), selection: TextSelection.collapsed(offset: t.length)))),
+                            ],
+                          ),
+                          if (_searchType == 'Registros') ...[
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _searchStatus,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Estatus del Registro',
+                                      border: OutlineInputBorder(),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    ),
+                                    items: _statusFilterOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                                    onChanged: (v) => setState(() { _searchStatus = v!; }),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _performSearch,
+                            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                            child: const Text('Buscar'),
                           ),
                         ],
                       ),
-                    ],
-
-                    const SizedBox(height: 16),
-
-                    ElevatedButton(
-                      onPressed: _performSearch,
-                      style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                      child: const Text('Buscar'),
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
 
-            const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-            // Botones de Acción
-            if (_results.isNotEmpty || _selectedItems.isNotEmpty)
-              Row(
-                children: [
-                  Expanded(child: ElevatedButton(onPressed: _toggleSelectAll, child: Text(_selectedItems.length == _results.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'))),
-                  const SizedBox(width: 8),
-                  if (_selectedItems.isNotEmpty)
-                    Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red), onPressed: _handleDelete, child: const Text('Borrar', style: TextStyle(color: Colors.white)))),
-                  if (_searchType == 'Equipos' && _results.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green), onPressed: _handleExport, child: const Text('Exportar', style: TextStyle(color: Colors.white)))),
-                  ]
+                  if (_results.isNotEmpty || _selectedItems.isNotEmpty)
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: ElevatedButton(
+                            onPressed: _toggleSelectAll,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(_selectedItems.length == _results.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (_selectedItems.isNotEmpty)
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                              onPressed: _handleDelete,
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('Borrar', style: TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                          ),
+                        if (_searchType == 'Equipos' && _results.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                              onPressed: _handleExport,
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('Exportar', style: TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                          ),
+                        ]
+                      ],
+                    ),
+
+                  const SizedBox(height: 8),
+                  const Divider(),
                 ],
               ),
+            ),
+          ),
 
-            const SizedBox(height: 8),
-            const Divider(),
-
-            // Lista de Resultados
-            if (_results.isEmpty)
-              const Expanded(child: Center(child: Text('No hay resultados.')))
-            else
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _results.length,
-                  itemBuilder: (context, index) {
+          // --- SECCIÓN INFERIOR: RESULTADOS (LISTA DESLIZABLE) ---
+          if (_results.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('No hay resultados.')),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
                     final item = _results[index];
                     final isSelected = _selectedItems.contains(item);
 
@@ -570,7 +593,9 @@ class _ReportScreenState extends State<ReportScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 4),
-                          Row(
+                          Wrap(
+                            spacing: 8.0,
+                            runSpacing: 4.0,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -581,7 +606,6 @@ class _ReportScreenState extends State<ReportScreen> {
                                 ),
                                 child: Text("Prioridad: ${item.priority}", style: const TextStyle(fontSize: 12)),
                               ),
-                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
@@ -603,7 +627,6 @@ class _ReportScreenState extends State<ReportScreen> {
                           const SizedBox(height: 4),
                           Text("${item.point}\n${item.description}"),
 
-                          // --- NUEVO: Mostrar la Nota si existe ---
                           if (item.actionNote.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             Container(
@@ -661,10 +684,11 @@ class _ReportScreenState extends State<ReportScreen> {
                       ),
                     );
                   },
+                  childCount: _results.length,
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

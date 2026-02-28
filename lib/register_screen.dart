@@ -1,3 +1,5 @@
+// lib/register_screen.dart
+
 import 'package:flutter/material.dart';
 import 'file_manager_locator.dart';
 import 'file_manager_interface.dart';
@@ -63,14 +65,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // CAMBIO: Enviamos 'Abierto' como estatus por defecto
     bool success = await fileManager.saveDataToFile(
       _currentDate,
       ut,
       point,
       description,
       _selectedPriority,
-      'Abierto', // <-- Estatus inicial
+      'Abierto',
     );
 
     if (success) {
@@ -179,11 +180,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 16),
 
+          // CORREGIDO OVERFLOW AQUÍ: Ajuste de flex para la fila Punto/Prioridad
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: 2,
+                flex: 3, // Más espacio al punto
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -201,9 +203,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 8), // Reducido espaciado central
               Expanded(
-                flex: 1,
+                flex: 2, // Menos espacio a prioridad
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -212,12 +214,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       value: _selectedPriority,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 16), // Padding interno reducido
                       ),
+                      isExpanded: true, // Esto ayuda a evitar overflow interno en el dropdown
                       items: _priorities.map((String value) {
                         return DropdownMenuItem<String>(
                           value: value,
-                          child: Text(value),
+                          child: Text(value, overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
                       onChanged: (newValue) {
@@ -246,8 +249,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 24),
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          // CORREGIDO OVERFLOW AQUÍ: Uso de Wrap para los botones inferiores
+          Wrap(
+            alignment: WrapAlignment.spaceEvenly,
+            spacing: 8.0,
+            runSpacing: 8.0,
             children: [
               ElevatedButton(
                 onPressed: () {
