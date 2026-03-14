@@ -7,11 +7,16 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
-import 'file_manager_locator.dart';
-import 'file_manager_interface.dart';
+import 'services/database_service.dart';
+import 'theme/app_theme.dart';
 import 'equipment_record.dart';
 import 'registro_record.dart';
+import 'widgets/dialogs/edit_status_dialog.dart';
+import 'widgets/dialogs/edit_equipment_dialog.dart';
+import 'widgets/items/registro_list_item.dart';
+import 'widgets/items/equipment_list_item.dart';
 import 'html_stub.dart' if (dart.library.html) 'dart:html' as html_stub;
 
 class ReportScreen extends StatefulWidget {
@@ -22,7 +27,13 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
-  final FileManagerInterface fileManager = getFileManager();
+  late DatabaseService fileManager;
+
+  @override
+  void initState() {
+    super.initState();
+    fileManager = Provider.of<DatabaseService>(context, listen: false);
+  }
 
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
@@ -89,86 +100,42 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   void _showEditStatusDialog(RegistroRecord item) {
-    String newStatus = item.status;
-    TextEditingController noteController = TextEditingController(text: item.actionNote);
-
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              title: const Text('Actualizar Estatus'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("UT: ${item.ut}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  const Text("Seleccione el nuevo estatus:"),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: newStatus,
-                    items: _statusEditOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                    onChanged: (val) {
-                      setStateDialog(() {
-                        if (val != null) newStatus = val;
-                      });
-                    },
-                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 16),
+        return EditStatusDialog(
+          item: item,
+          onSave: (RegistroRecord recordToUpdate, String newStatus, String noteText) async {
+            bool success = await fileManager.updateRegistroStatus(recordToUpdate, newStatus, noteText);
 
-                  if (newStatus == 'En Proceso' || newStatus == 'Culminado')
-                    TextField(
-                      controller: noteController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nota de la acción (Opcional)',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 2,
-                    ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
+            if (success) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Estatus actualizado a: $newStatus')));
+              }
 
-                    final noteText = noteController.text.trim();
-                    bool success = await fileManager.updateRegistroStatus(item, newStatus, noteText);
-
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Estatus actualizado a: $newStatus'))
-                      );
-
-                      setState(() {
-                        int index = _results.indexOf(item);
-                        if (index != -1) {
-                          final oldItem = _results[index] as RegistroRecord;
-                          final newItem = RegistroRecord(
-                            id: oldItem.id, date: oldItem.date, ut: oldItem.ut,
-                            point: oldItem.point, description: oldItem.description,
-                            priority: oldItem.priority, status: newStatus, actionNote: noteText,
-                          );
-                          _results[index] = newItem;
-                        }
-                      });
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Error al actualizar estatus'))
-                      );
-                    }
-                  },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            );
+              setState(() {
+                int index = _results.indexOf(recordToUpdate);
+                if (index != -1) {
+                  final newItem = RegistroRecord(
+                    id: recordToUpdate.id,
+                    date: recordToUpdate.date,
+                    ut: recordToUpdate.ut,
+                    point: recordToUpdate.point,
+                    description: recordToUpdate.description,
+                    priority: recordToUpdate.priority,
+                    status: newStatus,
+                    actionNote: noteText,
+                  );
+                  _results[index] = newItem;
+                }
+              });
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Error al actualizar estatus')));
+              }
+            }
           },
         );
       },
@@ -176,93 +143,40 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   void _showEditEquipmentDialog(EquipmentRecord item) {
-    final TextEditingController utEditController = TextEditingController(text: item.ut);
-    final TextEditingController equipEditController = TextEditingController(text: item.equipment);
-
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Editar Equipo'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Corrija los datos necesarios:"),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: utEditController,
-                  decoration: const InputDecoration(labelText: 'UT', border: OutlineInputBorder()),
-                  onChanged: (text) {
-                    utEditController.value = utEditController.value.copyWith(
-                      text: text.toUpperCase(),
-                      selection: TextSelection.collapsed(offset: text.length),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: equipEditController,
-                  decoration: const InputDecoration(labelText: 'Equipo / Imagen', border: OutlineInputBorder()),
-                  onChanged: (text) {
-                    equipEditController.value = equipEditController.value.copyWith(
-                      text: text.toUpperCase(),
-                      selection: TextSelection.collapsed(offset: text.length),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newUt = utEditController.text.trim();
-                final newEquip = equipEditController.text.trim();
+        return EditEquipmentDialog(
+          item: item,
+          onSave: (EquipmentRecord recordToUpdate, String newUt, String newEquip) async {
+            final String newDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
+            bool success = await fileManager.updateEquipment(recordToUpdate, newUt, newEquip, newDate);
 
-                if (newUt.isEmpty || newEquip.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Los campos no pueden estar vacíos'))
+            if (success) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Equipo actualizado correctamente')));
+              }
+
+              setState(() {
+                int index = _results.indexOf(recordToUpdate);
+                if (index != -1) {
+                  final newItem = EquipmentRecord(
+                    id: recordToUpdate.id,
+                    date: newDate,
+                    ut: newUt,
+                    equipment: newEquip,
                   );
-                  return;
+                  _results[index] = newItem;
                 }
-
-                Navigator.pop(context);
-
-                final String newDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
-                bool success = await fileManager.updateEquipment(item, newUt, newEquip, newDate);
-
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Equipo actualizado correctamente'))
-                  );
-
-                  setState(() {
-                    int index = _results.indexOf(item);
-                    if (index != -1) {
-                      final oldItem = _results[index] as EquipmentRecord;
-                      final newItem = EquipmentRecord(
-                        id: oldItem.id,
-                        date: newDate,
-                        ut: newUt,
-                        equipment: newEquip,
-                      );
-                      _results[index] = newItem;
-                    }
-                  });
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error al actualizar el equipo'))
-                  );
-                }
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
+              });
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Error al actualizar el equipo')));
+              }
+            }
+          },
         );
       },
     );
@@ -404,15 +318,6 @@ class _ReportScreenState extends State<ReportScreen> {
     });
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'Abierto': return Colors.red.shade700;
-      case 'En Proceso': return Colors.orange.shade800;
-      case 'Culminado': return Colors.green.shade700;
-      default: return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -422,47 +327,70 @@ class _ReportScreenState extends State<ReportScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-              child: Column(
-                children: [
-                  Row(
+              child: Card(
+                elevation: 0,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: DropdownButtonFormField<String>(
-                          value: _searchType,
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          items: _searchOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                          onChanged: (v) => setState(() { _searchType = v!; _results = []; _selectedItems.clear(); }),
-                        ),
-                      ),
-                      if (_searchType == 'Registros') ...[
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String>(
-                            value: _searchPriority,
-                            decoration: const InputDecoration(
-                              labelText: 'Prioridad',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: DropdownButtonFormField<String>(
+                              value: _searchType,
+                              isExpanded: true, // PREVIENE OVERFLOW DE TEXTO LARGO
+                              decoration: InputDecoration(
+                                labelText: 'Tipo', // Texto más corto
+                                prefixIcon: const Icon(Icons.search),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              items: _searchOptions.map((v) => DropdownMenuItem(
+                                value: v, 
+                                child: Text(v, overflow: TextOverflow.ellipsis) // Previene overflow en el item
+                              )).toList(),
+                              onChanged: (v) => setState(() { _searchType = v!; _results = []; _selectedItems.clear(); }),
                             ),
-                            items: _priorityOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                            onChanged: (v) => setState(() { _searchPriority = v!; }),
                           ),
-                        ),
-                      ],
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        icon: Icon(_areFiltersVisible ? Icons.expand_less : Icons.filter_list),
-                        tooltip: _areFiltersVisible ? "Ocultar Filtros" : "Mostrar Filtros",
-                        onPressed: () => setState(() => _areFiltersVisible = !_areFiltersVisible),
+                          if (_searchType == 'Registros') ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                                value: _searchPriority,
+                                isExpanded: true, // PREVIENE OVERFLOW DE TEXTO LARGO
+                                decoration: InputDecoration(
+                                  labelText: 'Prioridad',
+                                  prefixIcon: const Icon(Icons.flag_outlined),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                items: _priorityOptions.map((v) => DropdownMenuItem(
+                                  value: v, 
+                                  child: Text(v, overflow: TextOverflow.ellipsis) // Previene overflow
+                                )).toList(),
+                                onChanged: (v) => setState(() { _searchPriority = v!; }),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(width: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: _areFiltersVisible ? Colors.indigo.shade50 : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              icon: Icon(_areFiltersVisible ? Icons.expand_less : Icons.tune),
+                              color: _areFiltersVisible ? Colors.indigo.shade700 : Colors.grey.shade600,
+                              tooltip: _areFiltersVisible ? "Ocultar Filtros Avanzados" : "Mostrar Filtros Avanzados",
+                              onPressed: () => setState(() => _areFiltersVisible = !_areFiltersVisible),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
 
                   AnimatedSize(
                     duration: const Duration(milliseconds: 300),
@@ -505,11 +433,15 @@ class _ReportScreenState extends State<ReportScreen> {
                               ],
                             ),
                           ],
-                          const SizedBox(height: 16),
-                          ElevatedButton(
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
                             onPressed: _performSearch,
-                            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                            child: const Text('Buscar'),
+                            icon: const Icon(Icons.search),
+                            label: const Text('Ejecutar Búsqueda'),
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 54),
+                              elevation: 2,
+                            ),
                           ),
                         ],
                       ),
@@ -536,7 +468,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           Expanded(
                             flex: 2,
                             child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.statusOpen),
                               onPressed: _handleDelete,
                               child: const FittedBox(
                                 fit: BoxFit.scaleDown,
@@ -549,11 +481,10 @@ class _ReportScreenState extends State<ReportScreen> {
                           Expanded(
                             flex: 2,
                             child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                               onPressed: _handleExport,
                               child: const FittedBox(
                                 fit: BoxFit.scaleDown,
-                                child: Text('Exportar', style: TextStyle(color: Colors.white)),
+                                child: Text('Exportar'),
                               ),
                             ),
                           ),
@@ -562,8 +493,9 @@ class _ReportScreenState extends State<ReportScreen> {
                     ),
 
                   const SizedBox(height: 8),
-                  const Divider(),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -582,107 +514,22 @@ class _ReportScreenState extends State<ReportScreen> {
                       (context, index) {
                     final item = _results[index];
                     final isSelected = _selectedItems.contains(item);
-
-                    String title = "";
-                    Widget? subtitleWidget;
-                    Widget? trailingWidget;
-
                     if (item is RegistroRecord) {
-                      title = "${item.ut} (${item.date})";
-                      subtitleWidget = Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 8.0,
-                            runSpacing: 4.0,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.grey),
-                                ),
-                                child: Text("Prioridad: ${item.priority}", style: const TextStyle(fontSize: 12)),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _getStatusColor(item.status).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: _getStatusColor(item.status)),
-                                ),
-                                child: Text(
-                                    item.status.toUpperCase(),
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: _getStatusColor(item.status)
-                                    )
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text("${item.point}\n${item.description}"),
-
-                          if (item.actionNote.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.blue.shade200),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(Icons.notes, size: 16, color: Colors.blue.shade700),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      "Nota: ${item.actionNote}",
-                                      style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blue.shade900, fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          ],
-                        ],
-                      );
-                      trailingWidget = IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () => _showEditStatusDialog(item),
-                        tooltip: "Editar Estatus",
+                      return RegistroListItem(
+                        item: item,
+                        isSelected: isSelected,
+                        onToggleSelection: () => _toggleSelection(item),
+                        onEdit: () => _showEditStatusDialog(item),
                       );
                     } else if (item is EquipmentRecord) {
-                      title = "${item.ut} (${item.date})";
-                      subtitleWidget = Text(item.equipment);
-
-                      trailingWidget = IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () => _showEditEquipmentDialog(item),
-                        tooltip: "Editar Equipo",
-                      );
+                        return EquipmentListItem(
+                          item: item,
+                          isSelected: isSelected,
+                          onToggleSelection: () => _toggleSelection(item),
+                          onEdit: () => _showEditEquipmentDialog(item),
+                        );
                     }
-
-                    return Card(
-                      color: isSelected ? Colors.blue[50] : null,
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: ListTile(
-                        leading: Checkbox(
-                          value: isSelected,
-                          onChanged: (bool? value) => _toggleSelection(item),
-                        ),
-                        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: subtitleWidget,
-                        trailing: trailingWidget,
-                        onTap: () => _toggleSelection(item),
-                      ),
-                    );
+                    return const SizedBox.shrink();
                   },
                   childCount: _results.length,
                 ),

@@ -1,9 +1,10 @@
-// lib/login_screen.dart
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'providers/auth_provider.dart';
 import 'auth_service.dart';
+import 'theme/app_theme.dart';
 
-// 1. DEFINIMOS LOS TRES ESTADOS POSIBLES
 enum AuthMode { login, register, passwordReset }
 
 class LoginScreen extends StatefulWidget {
@@ -18,57 +19,57 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // 2. USAMOS EL NUEVO 'enum' PARA EL ESTADO
   AuthMode _authMode = AuthMode.login;
   String? _errorMessage;
   String? _successMessage;
 
-  // Función para limpiar mensajes y cambiar el estado
   void _setAuthMode(AuthMode newMode) {
     setState(() {
       _authMode = newMode;
       _errorMessage = null;
       _successMessage = null;
-      // Limpiamos la contraseña si volvemos a "Reset"
       if (newMode == AuthMode.passwordReset) {
         _passwordController.clear();
       }
     });
   }
 
-  // Función unificada para Login y Registro
   Future<void> _handleSubmit() async {
     setState(() { _errorMessage = null; _successMessage = null; });
 
-    final email = _emailController.text;
+    final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() { _errorMessage = "Email y contraseña no pueden estar vacíos."; });
+      setState(() { _errorMessage = "Email y contraseña son obligatorios."; });
       return;
     }
 
-    if (_authMode == AuthMode.login) {
-      // Estamos en modo Login
-      final result = await _authService.signInWithEmail(email, password);
-      if (result == null) {
-        setState(() { _errorMessage = "Error al iniciar sesión. Verifica tus datos."; });
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    try {
+      if (_authMode == AuthMode.login) {
+        await authProvider.signInWithEmailAndPassword(email, password);
+      } else {
+        await authProvider.createUserWithEmailAndPassword(email, password);
       }
-    } else {
-      // Estamos en modo Registro
-      final result = await _authService.registerWithEmail(email, password);
-      if (result == null) {
-        setState(() { _errorMessage = "Error al registrar. El email ya podría estar en uso."; });
-      }
+    } catch (e) {
+      setState(() {
+         if (_authMode == AuthMode.login) {
+            _errorMessage = "Credenciales inválidas. Verifica tus datos.";
+         } else {
+            _errorMessage = "Algo falló. Quizá el correo ya está registrado.";
+         }
+      });
     }
   }
 
   Future<void> _handlePasswordReset() async {
     setState(() { _errorMessage = null; _successMessage = null; });
 
-    final email = _emailController.text;
+    final email = _emailController.text.trim();
     if (email.isEmpty) {
-      setState(() { _errorMessage = "Por favor, ingresa tu correo en el campo de arriba para restablecer la contraseña."; });
+      setState(() { _errorMessage = "Ingresa tu correo para restablecer la contraseña."; });
       return;
     }
 
@@ -76,127 +77,207 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (result == "success") {
       setState(() {
-        _successMessage = "Se ha enviado un correo a $email. Revisa tu bandeja de entrada (y spam).";
+        _successMessage = "Se ha enviado un correo a \$email.";
       });
     } else {
       setState(() { _errorMessage = result; });
     }
   }
 
-  // 3. FUNCIÓN PARA OBTENER EL TÍTULO CORRECTO
   String _getTitle() {
     switch (_authMode) {
-      case AuthMode.login:
-        return 'Iniciar Sesión';
-      case AuthMode.register:
-        return 'Registrar Usuario';
-      case AuthMode.passwordReset:
-        return 'Restablecer Contraseña';
+      case AuthMode.login: return 'Bienvenido de nuevo';
+      case AuthMode.register: return 'Crear nueva cuenta';
+      case AuthMode.passwordReset: return 'Recuperar acceso';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos los colores primarios del AppTheme
+    final primaryColor = Theme.of(context).primaryColor;
+    
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_getTitle()), // Título dinámico
-        backgroundColor: Colors.blueGrey[900],
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // --- CAMPO EMAIL (Siempre visible) ---
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Correo Electrónico',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-
-              // --- 4. CAMPO CONTRASEÑA (Ahora es condicional) ---
-              // Solo se muestra si NO estamos en modo 'passwordReset'
-              if (_authMode != AuthMode.passwordReset)
-                TextField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Contraseña',
-                    border: OutlineInputBorder(),
+      // Evitar appbar estricto para un look más moderno
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 450), // Limitar ancho en tablets/web
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // --- HEADER VISUAL ---
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _authMode == AuthMode.login ? Icons.lock_person :
+                      _authMode == AuthMode.register ? Icons.person_add :
+                      Icons.mark_email_read,
+                      size: 40,
+                      color: primaryColor,
+                    ),
                   ),
-                  obscureText: true,
-                ),
-              const SizedBox(height: 24),
+                  const SizedBox(height: 24),
+                  Text(
+                    _getTitle(),
+                    style: GoogleFonts.outfit(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimaryColor,
+                      letterSpacing: -0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "MulReport CND Management",
+                    style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 16),
+                  ),
+                  const SizedBox(height: 40),
 
-              // --- MOSTRAR ERROR (si existe) ---
-              if (_errorMessage != null)
-                Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
+                  // --- FORMULARIO EN TARJETA FLOTANTE ---
+                  Container(
+                    padding: const EdgeInsets.all(24.0),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        )
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Campo Email
+                        TextField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Correo Electrónico',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        
+                        // Campo Contraseña (Condicional animado)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          height: _authMode == AuthMode.passwordReset ? 0 : 80,
+                          curve: Curves.easeInOut,
+                          child: SingleChildScrollView(
+                            physics: const NeverScrollableScrollPhysics(),
+                            child: Column(
+                              children: [
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _passwordController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Contraseña',
+                                    prefixIcon: Icon(Icons.lock_outline),
+                                  ),
+                                  obscureText: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
 
-              // --- MOSTRAR ÉXITO (si existe) ---
-              if (_successMessage != null)
-                Text(
-                  _successMessage!,
-                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
+                        // Mensajes de Alerta
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(_errorMessage!, style: TextStyle(color: Colors.red.shade900, fontSize: 13))),
+                              ],
+                            ),
+                          )
+                        ],
 
-              const SizedBox(height: 16),
+                        if (_successMessage != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle_outline, color: Colors.green.shade700, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(_successMessage!, style: TextStyle(color: Colors.green.shade900, fontSize: 13))),
+                              ],
+                            ),
+                          )
+                        ],
 
-              // --- 5. BOTÓN PRINCIPAL (AHORA DINÁMICO) ---
-              ElevatedButton(
-                // La acción del botón depende del modo
-                onPressed: _authMode == AuthMode.passwordReset
-                    ? _handlePasswordReset
-                    : _handleSubmit,
-                style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    // Color dinámico (verde para login/registro, azul para reset)
-                    backgroundColor: _authMode == AuthMode.passwordReset
-                        ? Colors.blue[700]
-                        : Colors.green[700],
-                    foregroundColor: Colors.white
-                ),
-                // Texto dinámico
-                child: Text(
-                    _authMode == AuthMode.login ? 'Iniciar Sesión' :
-                    _authMode == AuthMode.register ? 'Registrar' :
-                    'Enviar correo de restablecimiento'
-                ),
+                        const SizedBox(height: 24),
+
+                        // Botón Principal
+                        ElevatedButton(
+                          onPressed: _authMode == AuthMode.passwordReset
+                              ? _handlePasswordReset
+                              : _handleSubmit,
+                          style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 54),
+                              shadowColor: primaryColor.withOpacity(0.4),
+                              elevation: 4,
+                          ),
+                          child: Text(
+                              _authMode == AuthMode.login ? 'Comenzar' :
+                              _authMode == AuthMode.register ? 'Unirse Ahora' :
+                              'Enviar Enlace'
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // --- BOTONES SECUNDARIOS ---
+                  if (_authMode == AuthMode.login)
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () => _setAuthMode(AuthMode.register),
+                          child: const Text('Crear una cuenta nueva'),
+                        ),
+                        TextButton(
+                          onPressed: () => _setAuthMode(AuthMode.passwordReset),
+                          child: const Text('Recuperar contraseña'),
+                        ),
+                      ],
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: () => _setAuthMode(AuthMode.login),
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Volver al inicio de sesión'),
+                    ),
+                ],
               ),
-              const SizedBox(height: 16),
-
-              // --- 6. BOTONES SECUNDARIOS (AHORA DINÁMICOS) ---
-              if (_authMode == AuthMode.login)
-              // Si estamos en Login, mostramos "Registrarse" y "Olvidé"
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton(
-                      onPressed: () => _setAuthMode(AuthMode.register),
-                      child: const Text('¿No tienes cuenta? Regístrate'),
-                    ),
-                    TextButton(
-                      onPressed: () => _setAuthMode(AuthMode.passwordReset),
-                      child: const Text('¿Olvidaste tu contraseña?'),
-                    ),
-                  ],
-                )
-              else
-              // Si estamos en Registro o Reset, solo mostramos "Volver a Login"
-                TextButton(
-                  onPressed: () => _setAuthMode(AuthMode.login),
-                  child: const Text('¿Ya tienes cuenta? Inicia sesión'),
-                ),
-            ],
+            ),
           ),
         ),
       ),

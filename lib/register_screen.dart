@@ -1,9 +1,10 @@
 // lib/register_screen.dart
 
 import 'package:flutter/material.dart';
-import 'file_manager_locator.dart';
-import 'file_manager_interface.dart';
-import 'equipment_record.dart';
+import 'package:provider/provider.dart';
+
+import 'services/database_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,10 +14,12 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final FileManagerInterface fileManager = getFileManager();
+  late DatabaseService fileManager;
+
+
 
   final TextEditingController _utController = TextEditingController();
-  final TextEditingController _pointController = TextEditingController();
+  final TextEditingController _symptomController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
   final String _currentDate =
@@ -30,7 +33,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     "PP50", "PP90", "PP95", "PP20", "PR"
   ];
 
-  final List<String> pointOptions = [
+  // Lista dinámica de síntomas. Empezamos con los predeterminados.
+  List<String> symptomOptions = [];
+
+  // Lista base original para fallback si no hay guardados
+  final List<String> defaultSymptomOptions = [
     "Vib/soporte", "Vib/reductor", "Roce",
     "Holgura", "Golpeteo", "Ruido/bandas",
     "Alta/temp", "Vib/estructural",
@@ -39,9 +46,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    fileManager = Provider.of<DatabaseService>(context, listen: false);
+    _loadSymptoms();
+  }
+
+  Future<void> _loadSymptoms() async {
+    // 1. Cargamos la lista base
+    List<String> combinedList = List.from(defaultSymptomOptions);
+    
+    // 2. Traemos todos los síntomas creados por la comunidad en Firebase
+    final globalSymptoms = await fileManager.getGlobalSymptoms();
+    
+    // 3. Unimos ambas listas y evitamos duplicados
+    for (String symp in globalSymptoms) {
+      if (!combinedList.contains(symp)) {
+        combinedList.add(symp);
+      }
+    }
+    
+    // 4. Ordenamos alfabéticamente para facilidad de lectura
+    combinedList.sort((a, b) => a.compareTo(b));
+
+    if (mounted) {
+      setState(() {
+        symptomOptions = combinedList;
+      });
+    }
+  }
+
+  Future<void> _saveSymptom(String newSymptom) async {
+    final newSympTrim = newSymptom.trim();
+    if (newSympTrim.isEmpty) return;
+    
+    // 1. Validar localmente ignorando mayúsculas/minúsculas
+    bool existsLocally = symptomOptions.any((sym) => sym.toUpperCase() == newSympTrim.toUpperCase());
+    if (existsLocally) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ese síntoma ya está en tu lista.')),
+        );
+      }
+      return;
+    }
+    
+    // 2. Guardar en la nube para todos los dispositivos
+    String result = await fileManager.saveGlobalSymptom(newSympTrim);
+    
+    if (mounted) {
+      if (result == 'success') {
+        await _loadSymptoms(); // Recargar la lista completa desde Firebase
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Síntoma "$newSympTrim" añadido globalmente')),
+        );
+      } else if (result == 'duplicate') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Este síntoma ya fue añadido por otro usuario.')),
+        );
+      } else {
+        // Hubo un error de Firebase (probablemente Reglas de Seguridad)
+        _showAlertDialog(
+          'Error de Sincronización', 
+          'No se pudo conectar a "sintomas_globales" en Firebase. Verifica tus reglas de seguridad en la consola web.\n\nDetalle: $result'
+        );
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _utController.dispose();
-    _pointController.dispose();
+    _symptomController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -50,11 +126,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     FocusScope.of(context).unfocus();
 
     final String ut = _utController.text;
-    final String point = _pointController.text;
+    final String symptom = _symptomController.text;
     final String description = _descriptionController.text;
 
-    if (ut.isEmpty || point.isEmpty) {
-      _showAlertDialog('Error', 'Los campos UT y Punto no pueden estar vacíos.');
+    if (ut.isEmpty || symptom.isEmpty || description.isEmpty) {
+      _showAlertDialog('Error', 'Todos los campos son obligatorios.');
       return;
     }
 
@@ -68,7 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     bool success = await fileManager.saveDataToFile(
       _currentDate,
       ut,
-      point,
+      symptom, // Pasando sintoma donde esperaba el point
       description,
       _selectedPriority,
       'Abierto',
@@ -76,8 +152,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (success) {
       _showSnackBar('¡Registro guardado exitosamente!');
+      // Limpiar formulario excepto fecha
       _utController.clear();
-      _pointController.clear();
+      _symptomController.clear();
       _descriptionController.clear();
       setState(() { _selectedPriority = 'Medio'; });
     } else {
@@ -114,34 +191,84 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  void _showPointDialog() {
+  void _showSymptomDialog() {
+    final TextEditingController newSymptomController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Seleccione el punto'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: pointOptions.map((option) {
-                return ListTile(
-                  title: Text(option),
-                  onTap: () {
-                    _pointController.text = option;
-                    Navigator.of(context).pop();
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancelar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Seleccione o agregue Síntoma'),
+              contentPadding: const EdgeInsets.only(top: 16.0),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Buscador / Añadir nuevo
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: newSymptomController,
+                              decoration: const InputDecoration(
+                                hintText: 'Nuevo síntoma...',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            icon: const Icon(Icons.add),
+                            onPressed: () {
+                              final txt = newSymptomController.text.trim();
+                              if (txt.isNotEmpty) {
+                                _saveSymptom(txt).then((_) {
+                                  // Recargar dialogo
+                                  setDialogState((){});
+                                  newSymptomController.clear();
+                                });
+                              }
+                            },
+                            tooltip: "Añadir a lista permanente",
+                          )
+                        ],
+                      ),
+                    ),
+                    const Divider(),
+                    // Lista existente
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: symptomOptions.length,
+                        itemBuilder: (context, index) {
+                          final option = symptomOptions[index];
+                          return ListTile(
+                            title: Text(option),
+                            onTap: () {
+                              _symptomController.text = option;
+                              Navigator.of(context).pop();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cancelar'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          }
         );
       },
     );
@@ -189,16 +316,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Punto', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Síntoma', style: TextStyle(fontWeight: FontWeight.bold)),
                     TextField(
-                      controller: _pointController,
+                      controller: _symptomController,
                       decoration: const InputDecoration(
-                        hintText: 'Seleccione punto',
+                        hintText: 'Seleccione síntoma',
                         border: OutlineInputBorder(),
                         suffixIcon: Icon(Icons.arrow_drop_down),
                       ),
                       readOnly: true,
-                      onTap: _showPointDialog,
+                      onTap: _showSymptomDialog,
                     ),
                   ],
                 ),
@@ -256,21 +383,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
             runSpacing: 8.0,
             children: [
               ElevatedButton(
-                onPressed: () {
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700]),
-                child: const Text('Salir', style: TextStyle(color: Colors.white)),
-              ),
-              ElevatedButton(
                 onPressed: _handleSave,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[700]),
-                child: const Text('Guardar', style: TextStyle(color: Colors.white)),
+                child: const Text('Guardar'),
               ),
               ElevatedButton(
                 onPressed: () {
                   _utController.clear();
-                  _pointController.clear();
+                  _symptomController.clear();
                   _descriptionController.clear();
                   setState(() { _selectedPriority = 'Medio'; });
                 },

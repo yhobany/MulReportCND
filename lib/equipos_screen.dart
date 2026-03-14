@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 // import 'package:permission_handler/permission_handler.dart'; // Ya no es estrictamente necesario para galería simple
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
-import 'file_manager_locator.dart';
-import 'file_manager_interface.dart';
+import 'services/database_service.dart';
+import 'theme/app_theme.dart';
+import 'equipment_record.dart';
 
 class EquiposScreen extends StatefulWidget {
   const EquiposScreen({super.key});
@@ -15,12 +18,19 @@ class EquiposScreen extends StatefulWidget {
 }
 
 class _EquiposScreenState extends State<EquiposScreen> {
-  final FileManagerInterface fileManager = getFileManager();
+  late DatabaseService fileManager;
+
+  @override
+  void initState() {
+    super.initState();
+    fileManager = Provider.of<DatabaseService>(context, listen: false);
+  }
 
   // Controladores
   final TextEditingController _utController = TextEditingController();
   final TextEditingController _equipoPrincipalController = TextEditingController();
   List<TextEditingController> _additionalEquipControllers = [];
+  List<FocusNode> _additionalEquipFocusNodes = [];
 
   // Fecha actual
   final String _currentDate =
@@ -34,17 +44,31 @@ class _EquiposScreenState extends State<EquiposScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
+  // Variables para validación predictiva
+  Timer? _debounce;
+  List<EquipmentRecord> _existingEquipments = [];
+  bool _isCheckingUt = false;
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _utController.dispose();
     _equipoPrincipalController.dispose();
     for (var controller in _additionalEquipControllers) controller.dispose();
+    for (var node in _additionalEquipFocusNodes) node.dispose();
     super.dispose();
   }
 
   void _addEquipmentField() {
     setState(() {
+      final newFocusNode = FocusNode();
       _additionalEquipControllers.add(TextEditingController());
+      _additionalEquipFocusNodes.add(newFocusNode);
+      
+      // Request focus after the frame builds
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        newFocusNode.requestFocus();
+      });
     });
   }
 
@@ -52,7 +76,111 @@ class _EquiposScreenState extends State<EquiposScreen> {
     setState(() {
       _additionalEquipControllers[index].dispose();
       _additionalEquipControllers.removeAt(index);
+      
+      _additionalEquipFocusNodes[index].dispose();
+      _additionalEquipFocusNodes.removeAt(index);
     });
+  }
+
+  void _onUtChanged(String text) {
+    // Convertir a mayúsculas y mantener cursor
+    _utController.value = _utController.value.copyWith(
+      text: text.toUpperCase(),
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+
+    final ut = text.toUpperCase();
+
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
+    // Si borró la UT, reseteamos la lista
+    if (ut.isEmpty) {
+      setState(() {
+        _existingEquipments.clear();
+        _isCheckingUt = false;
+      });
+      return;
+    }
+
+    // Esperar 800ms de inactividad
+    _debounce = Timer(const Duration(milliseconds: 800), () async {
+      // Validar si el prefijo es válido antes de consultar la BD
+      final bool isValidPrefix = validPrefixes.any((prefix) => ut.startsWith(prefix));
+      if (!isValidPrefix) return;
+
+      setState(() { _isCheckingUt = true; });
+      final equipments = await fileManager.getEquipmentByUt(ut);
+      if (mounted) {
+        setState(() {
+          _existingEquipments = equipments;
+          _isCheckingUt = false;
+        });
+      }
+    });
+  }
+
+  Future<List<EquipmentRecord>?> _showMultiDuplicateWarning(List<EquipmentRecord> conflicts, String ut) {
+    List<EquipmentRecord> selectedToOverwrite = List.from(conflicts);
+
+    return showDialog<List<EquipmentRecord>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Equipos Duplicados'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Se encontraron equipos ya registrados para la UT "$ut".\n\nSelecciona cuáles deseas actualizar a la fecha de hoy:'),
+                    const SizedBox(height: 16),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: conflicts.length,
+                        itemBuilder: (context, index) {
+                          final record = conflicts[index];
+                          return CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(record.equipment, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('Original: ${record.date}'),
+                            value: selectedToOverwrite.contains(record),
+                            activeColor: AppTheme.accentColor,
+                            onChanged: (bool? value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  selectedToOverwrite.add(record);
+                                } else {
+                                  selectedToOverwrite.remove(record);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, null),
+                  child: const Text('Cancelar Guardado'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, selectedToOverwrite),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
+                  child: const Text('Continuar', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
   }
 
   Future<void> _handleSave() async {
@@ -88,21 +216,65 @@ class _EquiposScreenState extends State<EquiposScreen> {
     }
 
     // 3. Guardar
-    bool allSuccess = true;
-    for (String equipment in allEquipments) {
-      bool success = await fileManager.saveEquipmentToCsv(_currentDate, ut, equipment);
-      if (!success) allSuccess = false;
+    int savedCount = 0;
+    bool hadErrors = false;
+    
+    // Identificar conflictos cruzando contra la lista asíncrona pre-cargada
+    List<EquipmentRecord> conflicts = [];
+    List<String> newEquipments = [];
+    
+    for (String eq in allEquipments) {
+      try {
+        final existing = _existingEquipments.firstWhere(
+          (e) => e.equipment.toUpperCase() == eq.toUpperCase()
+        );
+        conflicts.add(existing);
+      } catch (e) {
+        newEquipments.add(eq);
+      }
     }
 
-    if (allSuccess) {
-      _showSnackBar('¡Equipos guardados exitosamente!');
+    List<EquipmentRecord> recordsToOverwrite = [];
+    
+    if (conflicts.isNotEmpty) {
+      final result = await _showMultiDuplicateWarning(conflicts, ut);
+      if (result == null) {
+        // El usuario presionó Cancelar Guardado
+        return;
+      }
+      recordsToOverwrite = result;
+    }
+
+    // 4. Guardar los que no tienen conflicto (nuevos)
+    for (String newEq in newEquipments) {
+      bool success = await fileManager.saveEquipmentToCsv(_currentDate, ut, newEq);
+      if (success) savedCount++; else hadErrors = true;
+    }
+    
+    // 5. Sobreescribir solo los seleccionados
+    for (var record in recordsToOverwrite) {
+      bool success = await fileManager.updateEquipment(record, ut, record.equipment, _currentDate);
+      if (success) savedCount++; else hadErrors = true;
+    }
+
+    if (hadErrors) {
+      _showAlertDialog('Error', 'Hubo problemas al guardar algunos equipos.');
+    } else if (savedCount > 0) {
+      _showSnackBar('¡$savedCount equipo(s) procesado(s) exitosamente!');
+      
+      // Actualizar la lista en memoria para que no haya falsos nuevos
+      _existingEquipments = await fileManager.getEquipmentByUt(ut);
+      
       // Limpiar formulario
       _utController.clear();
       _equipoPrincipalController.clear();
       for (var controller in _additionalEquipControllers) controller.dispose();
-      setState(() { _additionalEquipControllers = []; });
-    } else {
-      _showAlertDialog('Error', 'No se pudieron guardar uno o más equipos.');
+      for (var node in _additionalEquipFocusNodes) node.dispose();
+      setState(() { 
+        _additionalEquipControllers = []; 
+        _additionalEquipFocusNodes = [];
+        _existingEquipments.clear();
+      });
     }
   }
 
@@ -222,12 +394,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                           border: OutlineInputBorder(),
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                         ),
-                        onChanged: (text) {
-                          _utController.value = _utController.value.copyWith(
-                            text: text.toUpperCase(),
-                            selection: TextSelection.collapsed(offset: text.length),
-                          );
-                        },
+                        onChanged: _onUtChanged,
                       ),
                     ],
                   ),
@@ -286,8 +453,9 @@ class _EquiposScreenState extends State<EquiposScreen> {
                       Expanded(
                         child: TextField(
                           controller: _additionalEquipControllers[index],
+                          focusNode: _additionalEquipFocusNodes[index],
                           decoration: InputDecoration(
-                            hintText: 'Equipo adicional ${index + 1}',
+                            hintText: 'Ej: Foto-0${index + 2}.jpg',
                             border: const OutlineInputBorder(),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           ),
@@ -306,7 +474,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                         tooltip: "Seleccionar imagen",
                       ),
                       IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                        icon: const Icon(Icons.remove_circle_outline, color: AppTheme.statusOpen),
                         onPressed: () => _removeEquipmentField(index),
                       ),
                     ],
@@ -334,8 +502,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
               child: ElevatedButton(
                 onPressed: _handleSave,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  foregroundColor: Colors.white,
                   elevation: 2,
                 ),
                 child: const Text(

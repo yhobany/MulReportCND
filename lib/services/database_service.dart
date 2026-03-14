@@ -1,23 +1,20 @@
-// lib/file_manager_firebase.dart
-
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'equipment_record.dart';
-import 'registro_record.dart';
-import 'file_manager_interface.dart';
+import '../equipment_record.dart';
+import '../registro_record.dart';
 
-class FileManager implements FileManagerInterface {
+class DatabaseService {
   final _firestore = FirebaseFirestore.instance;
 
   DateTime? _parseDate(String dateStr) {
     try { return DateFormat('d/M/yyyy').parseStrict(dateStr); } catch (e) { return null; }
   }
 
-  @override
   Future<bool> saveDataToFile(
       String date, String ut, String point, String description, String priority, String status) async {
     try {
@@ -29,7 +26,52 @@ class FileManager implements FileManagerInterface {
     } catch (e) { return false; }
   }
 
-  @override
+  // --- SÍNTOMAS GLOBALES ---
+
+  Future<List<String>> getGlobalSymptoms() async {
+    final results = <String>[];
+    try {
+      final snapshot = await _firestore.collection('sintomas_globales').orderBy('name').get();
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['name'] != null && data['name'].toString().trim().isNotEmpty) {
+          results.add(data['name']);
+        }
+      }
+    } catch (e) {
+      print("Error obteniendo síntomas globales en Firestore: $e");
+    }
+    return results;
+  }
+
+  Future<String> saveGlobalSymptom(String newSymptom) async {
+    try {
+      final trimmed = newSymptom.trim();
+      if (trimmed.isEmpty) return 'error: empty string';
+      
+      // Formato: Inicial mayúscula, resto minúsculas (Ej: "vIbRaCioN" -> "Vibracion")
+      final formattedSymptom = trimmed[0].toUpperCase() + trimmed.substring(1).toLowerCase();
+      
+      // Validar duplicados exactos en la nube primero
+      final existing = await _firestore.collection('sintomas_globales')
+          .where('name', isEqualTo: formattedSymptom)
+          .limit(1)
+          .get();
+          
+      if (existing.docs.isEmpty) {
+        await _firestore.collection('sintomas_globales').add({
+          'name': formattedSymptom, // Guardamos con formato capitalizado
+          'timestamp': Timestamp.now(),
+        });
+        return 'success';
+      }
+      return 'duplicate'; // Ya existía
+    } catch (e) {
+      print("Error guardando síntoma global en Firestore: $e");
+      return 'error: $e';
+    }
+  }
+
   Future<List<RegistroRecord>> searchInFile(String startDateStr, String endDateStr, String ut, String plant, String priority, String status) async {
     final results = <RegistroRecord>[];
     try {
@@ -65,7 +107,6 @@ class FileManager implements FileManagerInterface {
     return results;
   }
 
-  @override
   Future<bool> updateRegistroStatus(RegistroRecord record, String newStatus, String actionNote) async {
     try {
       if (record.id == null) return false;
@@ -77,7 +118,6 @@ class FileManager implements FileManagerInterface {
     } catch (e) { return false; }
   }
 
-  @override
   Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete) async {
     try {
       final collection = _firestore.collection('registros');
@@ -90,7 +130,6 @@ class FileManager implements FileManagerInterface {
 
   // --- EQUIPOS ---
 
-  @override
   Future<bool> updateEquipment(EquipmentRecord record, String newUt, String newEquipment, String newDate) async {
     try {
       if (record.id == null) return false;
@@ -102,12 +141,11 @@ class FileManager implements FileManagerInterface {
       });
       return true;
     } catch (e) {
-      print("Error al actualizar equipo en Firestore: $e");
+      print("Error al actualizar equipo en Firestore: \$e");
       return false;
     }
   }
 
-  @override
   Future<List<EquipmentRecord>> searchInEquiposFile(String startDateStr, String endDateStr, String ut, String plant) async {
     final results = <EquipmentRecord>[];
     try {
@@ -134,7 +172,6 @@ class FileManager implements FileManagerInterface {
     return results;
   }
 
-  @override
   Future<bool> saveEquipmentToCsv(String date, String ut, String equipment) async {
     try {
       await _firestore.collection('equipos').add({
@@ -144,7 +181,29 @@ class FileManager implements FileManagerInterface {
     } catch (e) { return false; }
   }
 
-  @override
+  /// Obtiene todos los equipos registrados para una UT en específico.
+  Future<List<EquipmentRecord>> getEquipmentByUt(String ut) async {
+    final results = <EquipmentRecord>[];
+    try {
+      final snapshot = await _firestore.collection('equipos')
+          .where('ut', isEqualTo: ut.toUpperCase())
+          .get();
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        results.add(EquipmentRecord(
+          id: doc.id,
+          date: data['date_string'] ?? '',
+          ut: data['ut'] ?? '',
+          equipment: data['equipment'] ?? ''
+        ));
+      }
+    } catch (e) {
+      print("Error obteniendo equipos para UT en Firestore: \$e");
+    }
+    return results;
+  }
+
   Future<List<EquipmentRecord>> readEquipmentRecords() async {
     final results = <EquipmentRecord>[];
     try {
@@ -157,7 +216,6 @@ class FileManager implements FileManagerInterface {
     return results;
   }
 
-  @override
   Future<bool> deleteEquipmentRecords(List<EquipmentRecord> recordsToDelete) async {
     try {
       final collection = _firestore.collection('equipos');
@@ -168,20 +226,18 @@ class FileManager implements FileManagerInterface {
     } catch (e) { return false; }
   }
 
-  @override
   Future<String> getNextImageName(String ut) async {
     final prefs = await SharedPreferences.getInstance();
     final prefix = ut.length >= 4 ? ut.substring(0, 4).toUpperCase() : ut.toUpperCase();
-    final key = "image_counter_$prefix";
+    final key = "image_counter_\$prefix";
     final int counter = prefs.getInt(key) ?? 1;
-    final String fileName = "$prefix-${counter.toString().padLeft(3, '0')}.jpg";
+    final String fileName = "\$prefix-\${counter.toString().padLeft(3, '0')}.jpg";
     await prefs.setInt(key, counter + 1);
     return fileName;
   }
 
-  @override
   Future<String?> exportRecords(List<EquipmentRecord> records) async {
     if (records.isEmpty) return null;
-    return records.map((r) => "${r.date},${r.ut},${r.equipment}").join('\n');
+    return records.map((r) => "\${r.date},\${r.ut},\${r.equipment}").join('\n');
   }
 }

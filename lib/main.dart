@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'auth_gate.dart'; // <-- 1. IMPORTAMOS EL 'AuthGate'
-
-// --- IMPORTACIÓN AÑADIDA QUE FALTABA ---
+import 'auth_gate.dart';
 import 'auth_service.dart';
-// --- FIN DE LA IMPORTACIÓN ---
+import 'providers/auth_provider.dart';
+import 'services/database_service.dart';
+import 'theme/app_theme.dart';
 
-// Importamos las pantallas que 'AuthGate' necesita conocer
 import 'register_screen.dart';
 import 'report_screen.dart';
 import 'equipos_screen.dart';
@@ -18,10 +18,20 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // --- 2. CAMBIO CLAVE ---
-  // Ya no usamos 'MyApp', ahora usamos 'AuthGate'
-  runApp(const AuthGate());
-  // --- FIN DEL CAMBIO ---
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        Provider<DatabaseService>(create: (_) => DatabaseService()),
+      ],
+      child: MaterialApp(
+        title: 'Report CND',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const AuthGate(),
+      ),
+    ),
+  );
 }
 
 // --- 3. 'MyApp' YA NO SE USA, PERO 'MainScreen' SÍ ---
@@ -35,24 +45,19 @@ class MainScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Report CND vFlutter'),
-        backgroundColor: Colors.blueGrey[900],
-        foregroundColor: Colors.white,
+        // Colores omitidos para usar el app_theme.dart
         // --- AÑADIMOS UN BOTÓN DE "CERRAR SESIÓN" ---
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar Sesión',
             onPressed: () {
-              // Ahora 'AuthService' sí está definido
-              AuthService().signOut();
+              Provider.of<AuthProvider>(context, listen: false).signOut();
             },
           )
         ],
         // --- FIN DEL CAMBIO ---
         bottom: const TabBar(
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.white,
           tabs: [
             Tab(text: 'Register', icon: Icon(Icons.app_registration)),
             Tab(text: 'Report', icon: Icon(Icons.search)),
