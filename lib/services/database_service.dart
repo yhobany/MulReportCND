@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../equipment_record.dart';
@@ -238,6 +237,10 @@ class DatabaseService {
 
   Future<String?> exportRecords(List<EquipmentRecord> records) async {
     if (records.isEmpty) return null;
-    return records.map((r) => "\${r.date},\${r.ut},\${r.equipment}").join('\n');
+    final csvRows = records.map((r) {
+      final String line = "${r.date},${r.ut},${r.equipment}";
+      return line;
+    }).toList();
+    return csvRows.join('\n');
   }
 }
