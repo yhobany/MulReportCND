@@ -77,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (result == "success") {
       setState(() {
-        _successMessage = "Se ha enviado un correo a \$email.";
+        _successMessage = "Se ha enviado un correo a $email.";
       });
     } else {
       setState(() { _errorMessage = result; });

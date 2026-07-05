@@ -295,7 +295,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
       // Esto simplifica la lógica y evita problemas de permisos de cámara en web
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80, // Opcional, ya que no subimos la imagen, pero reduce uso de RAM al procesar
       );
 
       if (photo != null) {
