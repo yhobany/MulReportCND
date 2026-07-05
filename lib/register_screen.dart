@@ -1,10 +1,7 @@
-// lib/register_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'services/database_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});

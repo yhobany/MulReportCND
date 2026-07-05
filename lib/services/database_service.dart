@@ -1,7 +1,6 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../equipment_record.dart';
@@ -22,7 +21,10 @@ class DatabaseService {
         'description': description, 'priority': priority, 'status': status, 'actionNote': ''
       });
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      debugPrint("Error al guardar datos de registro en Firestore: $e");
+      return false;
+    }
   }
 
   // --- SÍNTOMAS GLOBALES ---
@@ -38,7 +40,7 @@ class DatabaseService {
         }
       }
     } catch (e) {
-      print("Error obteniendo síntomas globales en Firestore: $e");
+      debugPrint("Error obteniendo síntomas globales en Firestore: $e");
     }
     return results;
   }
@@ -66,7 +68,7 @@ class DatabaseService {
       }
       return 'duplicate'; // Ya existía
     } catch (e) {
-      print("Error guardando síntoma global en Firestore: $e");
+      debugPrint("Error guardando síntoma global en Firestore: $e");
       return 'error: $e';
     }
   }
@@ -102,7 +104,9 @@ class DatabaseService {
           ));
         }
       }
-    } catch (e) { }
+    } catch (e) {
+      debugPrint("Error al buscar registros en Firestore: $e");
+    }
     return results;
   }
 
@@ -114,7 +118,10 @@ class DatabaseService {
         'actionNote': actionNote,
       });
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      debugPrint("Error al actualizar estado del registro en Firestore: $e");
+      return false;
+    }
   }
 
   Future<bool> deleteRegistros(List<RegistroRecord> recordsToDelete) async {
@@ -124,7 +131,10 @@ class DatabaseService {
       for (var record in recordsToDelete) { if (record.id != null) batch.delete(collection.doc(record.id)); }
       await batch.commit();
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      debugPrint("Error al eliminar registros en Firestore: $e");
+      return false;
+    }
   }
 
   // --- EQUIPOS ---
@@ -140,7 +150,7 @@ class DatabaseService {
       });
       return true;
     } catch (e) {
-      print("Error al actualizar equipo en Firestore: \$e");
+      debugPrint("Error al actualizar equipo en Firestore: $e");
       return false;
     }
   }
@@ -167,7 +177,9 @@ class DatabaseService {
           results.add(EquipmentRecord(id: doc.id, date: data['date_string'] ?? '', ut: recordUt, equipment: data['equipment'] ?? ''));
         }
       }
-    } catch (e) { }
+    } catch (e) {
+      debugPrint("Error al buscar equipos en Firestore: $e");
+    }
     return results;
   }
 
@@ -177,7 +189,10 @@ class DatabaseService {
         'date_string': date, 'timestamp': Timestamp.now(), 'ut': ut, 'equipment': equipment,
       });
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      debugPrint("Error al guardar equipo en Firestore: $e");
+      return false;
+    }
   }
 
   /// Obtiene todos los equipos registrados para una UT en específico.
@@ -198,7 +213,7 @@ class DatabaseService {
         ));
       }
     } catch (e) {
-      print("Error obteniendo equipos para UT en Firestore: \$e");
+      debugPrint("Error obteniendo equipos para UT en Firestore: $e");
     }
     return results;
   }
@@ -208,10 +223,12 @@ class DatabaseService {
     try {
       final snapshot = await _firestore.collection('equipos').orderBy('timestamp', descending: true).get();
       for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         results.add(EquipmentRecord(id: doc.id, date: data['date_string'] ?? '', ut: data['ut'] ?? '', equipment: data['equipment'] ?? ''));
       }
-    } catch (e) { }
+    } catch (e) {
+      debugPrint("Error al leer equipos de Firestore: $e");
+    }
     return results;
   }
 
@@ -222,15 +239,18 @@ class DatabaseService {
       for (var record in recordsToDelete) { if (record.id != null) batch.delete(collection.doc(record.id)); }
       await batch.commit();
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      debugPrint("Error al eliminar equipos de Firestore: $e");
+      return false;
+    }
   }
 
   Future<String> getNextImageName(String ut) async {
     final prefs = await SharedPreferences.getInstance();
     final prefix = ut.length >= 4 ? ut.substring(0, 4).toUpperCase() : ut.toUpperCase();
-    final key = "image_counter_\$prefix";
+    final key = "image_counter_$prefix";
     final int counter = prefs.getInt(key) ?? 1;
-    final String fileName = "\$prefix-\${counter.toString().padLeft(3, '0')}.jpg";
+    final String fileName = "$prefix-${counter.toString().padLeft(3, '0')}.jpg";
     await prefs.setInt(key, counter + 1);
     return fileName;
   }
