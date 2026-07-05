@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-// import 'package:permission_handler/permission_handler.dart'; // Ya no es estrictamente necesario para galería simple
-import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'services/database_service.dart';
@@ -41,8 +38,6 @@ class _EquiposScreenState extends State<EquiposScreen> {
     "PFM6", "PFM4", "PCM1", "PCM3", "PP30", "PP40",
     "PP50", "PP90", "PP95", "PP20", "PR"
   ];
-
-  final ImagePicker _picker = ImagePicker();
 
   // Variables para validación predictiva
   Timer? _debounce;
@@ -291,15 +286,14 @@ class _EquiposScreenState extends State<EquiposScreen> {
     */
 
     try {
-      // Forzamos uso de Galería en todos los casos (Web y Móvil)
-      // Esto simplifica la lógica y evita problemas de permisos de cámara en web
-      final XFile? photo = await _picker.pickImage(
-        source: ImageSource.gallery,
+      final FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
       );
 
-      if (photo != null) {
-        // Obtenemos solo el nombre del archivo (ej: imagen.jpg)
-        final String fileName = photo.name;
+      if (result != null && result.files.isNotEmpty) {
+        // Obtenemos el nombre original exacto del archivo de forma segura
+        final String fileName = result.files.first.name.split('/').last.split('\\').last;
 
         setState(() {
           if (index == null) {
