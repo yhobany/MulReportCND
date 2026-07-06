@@ -51,7 +51,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
   String _searchStatus = 'Todos';
   final List<String> _statusFilterOptions = ['Todos', 'Abierto', 'En Proceso', 'Culminado'];
-  final List<String> _statusEditOptions = ['Abierto', 'En Proceso', 'Culminado'];
 
   bool _areFiltersVisible = true;
 

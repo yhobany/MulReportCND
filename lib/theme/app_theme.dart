@@ -90,7 +90,7 @@ class AppTheme {
       ),
 
       // Tarjetas Suaves
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: surfaceColor,
         elevation: 0, // Sin sombra dura
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -101,7 +101,7 @@ class AppTheme {
       ),
       
       // Diálogos Modernos
-      dialogTheme: DialogThemeData(
+      dialogTheme: DialogTheme(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -113,7 +113,7 @@ class AppTheme {
       ),
 
       // TabBar
-      tabBarTheme: TabBarThemeData(
+      tabBarTheme: TabBarTheme(
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white70,
         indicatorColor: Colors.white,
