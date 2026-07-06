@@ -42,6 +42,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
   // Variables para validación predictiva
   Timer? _debounce;
   List<EquipmentRecord> _existingEquipments = [];
+  bool _isCheckingUt = false;
 
   @override
   void dispose() {
