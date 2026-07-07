@@ -286,9 +286,10 @@ class _EquiposScreenState extends State<EquiposScreen> {
     */
 
     try {
+      // Usamos FileType.any para forzar el explorador de archivos nativo del sistema (Storage Access Framework)
+      // en Android/iOS en lugar del Photo Picker de galería (que reanombra las fotos a IDs numéricos).
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'heic', 'HEIC'],
+        type: FileType.any,
         allowMultiple: false,
       );
 
