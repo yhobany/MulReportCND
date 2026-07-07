@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Reglas para la colección 'users' (Aprobación de Usuarios)
+    match /users/{userId} {
+      // 1. Un usuario nuevo o autenticado puede leer y escribir su propio documento (ej. al registrarse con status 'pending')
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // 2. Administradores o usuarios aprobados pueden leer/gestionar (ajustar según tu lógica en consola web)
+      allow read, write: if request.auth != null;
+    }
+
+    // Reglas para síntomas y registros (Acceso general para usuarios autenticados)
+    match /sintomas_globales/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /registros_cnd/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Fallback por defecto para colecciones adicionales
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

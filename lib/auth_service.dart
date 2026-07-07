@@ -1,5 +1,6 @@
 // lib/auth_service.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -16,7 +17,7 @@ class AuthService {
       );
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print("Error al iniciar sesión: ${e.message}");
+      debugPrint("Error al iniciar sesión: ${e.message}");
       return null;
     }
   }
@@ -29,6 +30,7 @@ class AuthService {
         password: password,
       );
 
+      // Creamos el documento en Firestore asegurando el estatus inicial 'pending'
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'uid': userCredential.user!.uid,
         'email': email,
@@ -36,12 +38,13 @@ class AuthService {
         'createdAt': Timestamp.now(),
       });
 
+      debugPrint("Usuario creado y documento registrado en Firestore: ${userCredential.user!.uid}");
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print("Error al registrar: ${e.message}");
+      debugPrint("Error al registrar en Firebase Auth: ${e.message}");
       return null;
     } catch (e) {
-      print("Error al crear documento de usuario: $e");
+      debugPrint("Error al crear documento de usuario en Firestore: $e");
       return null;
     }
   }

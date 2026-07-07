@@ -287,7 +287,8 @@ class _EquiposScreenState extends State<EquiposScreen> {
 
     try {
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'heic', 'HEIC'],
         allowMultiple: false,
       );
 
@@ -382,10 +383,20 @@ class _EquiposScreenState extends State<EquiposScreen> {
                       const SizedBox(height: 8),
                       TextField(
                         controller: _utController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Ej: PFM6-123',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          suffixIcon: _isCheckingUt 
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ) 
+                              : null,
                         ),
                         onChanged: _onUtChanged,
                       ),

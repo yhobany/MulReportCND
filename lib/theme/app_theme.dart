@@ -88,39 +88,6 @@ class AppTheme {
         labelStyle: const TextStyle(color: textSecondaryColor),
         hintStyle: const TextStyle(color: textSecondaryColor),
       ),
-
-      // Tarjetas Suaves
-      cardTheme: CardTheme(
-        color: surfaceColor,
-        elevation: 0, // Sin sombra dura
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade200), // Borde muy sutil
-        ),
-      ),
-      
-      // Diálogos Modernos
-      dialogTheme: DialogTheme(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        titleTextStyle: GoogleFonts.outfit(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: textPrimaryColor,
-        ),
-      ),
-
-      // TabBar
-      tabBarTheme: TabBarTheme(
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white70,
-        indicatorColor: Colors.white,
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w400),
-      ),
     );
   }
 }
