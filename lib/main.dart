@@ -57,10 +57,17 @@ class MainScreen extends StatelessWidget {
         ],
         // --- FIN DEL CAMBIO ---
         bottom: const TabBar(
+          labelColor: Colors.white,
+          unselectedLabelColor: Color(0xFFE2E8F0), // Slate 200 - Blanco hielo claro de muy alto contraste
+          indicatorColor: Color(0xFFFBBF24), // Amber 400 - Indicador dorado vibrante
+          indicatorWeight: 3.5,
+          indicatorSize: TabBarIndicatorSize.tab,
+          labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
           tabs: [
-            Tab(text: 'Register', icon: Icon(Icons.app_registration)),
-            Tab(text: 'Report', icon: Icon(Icons.search)),
-            Tab(text: 'Equipos', icon: Icon(Icons.camera_alt)),
+            Tab(text: 'Register', icon: Icon(Icons.app_registration, size: 26)),
+            Tab(text: 'Report', icon: Icon(Icons.search, size: 26)),
+            Tab(text: 'Equipos', icon: Icon(Icons.camera_alt, size: 26)),
           ],
         ),
       ),
