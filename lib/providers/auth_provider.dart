@@ -27,8 +27,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> createUserWithEmailAndPassword(String email, String password) async {
+    UserCredential? userCredential;
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       // Solo se ejecuta si la cuenta nueva se creó exitosamente en Firebase Auth.
       // Los usuarios existentes nunca llegarán aquí, preservando su información intacta.
       await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
@@ -38,6 +39,15 @@ class AuthProvider extends ChangeNotifier {
         'createdAt': Timestamp.now(),
       });
     } catch (e) {
+      // Si la cuenta se creó en Auth pero falló el registro en la base de datos (Firestore),
+      // eliminamos el usuario en Auth para evitar cuentas huérfanas e inconsistencias.
+      if (userCredential != null && userCredential.user != null) {
+        try {
+          await userCredential.user!.delete();
+        } catch (deleteError) {
+          // Ignorar error de eliminación
+        }
+      }
       rethrow;
     }
   }

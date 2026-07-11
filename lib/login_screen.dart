@@ -52,13 +52,32 @@ class _LoginScreenState extends State<LoginScreen> {
         await authProvider.signInWithEmailAndPassword(email, password);
       } else {
         await authProvider.createUserWithEmailAndPassword(email, password);
+        // Cerramos la sesión inmediatamente para que no pase automáticamente a la app.
+        await authProvider.signOut();
+        setState(() {
+          _authMode = AuthMode.login;
+          _errorMessage = null;
+          _successMessage = "¡Registro enviado! Tu cuenta está pendiente de aprobación por el administrador.";
+          _passwordController.clear();
+        });
       }
     } catch (e) {
       setState(() {
          if (_authMode == AuthMode.login) {
             _errorMessage = "Credenciales inválidas. Verifica tus datos.";
          } else {
-            _errorMessage = "Algo falló. Quizá el correo ya está registrado.";
+            final errorStr = e.toString();
+            if (errorStr.contains('email-already-in-use') || errorStr.contains('already registered')) {
+              _errorMessage = "El correo ya está registrado por otro usuario.";
+            } else if (errorStr.contains('weak-password')) {
+              _errorMessage = "La contraseña debe tener al menos 6 caracteres.";
+            } else if (errorStr.contains('invalid-email')) {
+              _errorMessage = "El formato del correo es inválido.";
+            } else if (errorStr.contains('permission-denied') || errorStr.contains('Firestore')) {
+              _errorMessage = "Error de permisos en Firestore. Asegúrate de configurar las reglas en la consola de Firebase.";
+            } else {
+              _errorMessage = "Error al registrar: $e";
+            }
          }
       });
     }
@@ -70,6 +89,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       setState(() { _errorMessage = "Ingresa tu correo para restablecer la contraseña."; });
+      return;
+    }
+
+    // Verificamos si el correo existe previamente en la base de datos de usuarios
+    final exists = await _authService.checkUserExistsInFirestore(email);
+    if (!exists) {
+      setState(() {
+        _errorMessage = "No existe ninguna cuenta registrada con este correo electrónico.";
+      });
       return;
     }
 

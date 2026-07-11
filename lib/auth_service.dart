@@ -58,6 +58,21 @@ class AuthService {
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // --- FUNCIÓN AÑADIDA ---
+  Future<bool> checkUserExistsInFirestore(String email) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint("Error al verificar existencia de usuario: $e");
+      return false;
+    }
+  }
+
+  // --- FUNCIÓN AÑADIDA ---
   Future<String> sendPasswordResetEmail(String email) async {
     try {
       // Le dice a Firebase que envíe el correo de restablecimiento
