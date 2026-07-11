@@ -1,27 +1,38 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Reglas para la colección 'users' (Aprobación de Usuarios)
-    match /users/{userId} {
-      // 1. Un usuario nuevo o autenticado puede leer y escribir su propio documento (ej. al registrarse con status 'pending')
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // 2. Administradores o usuarios aprobados pueden leer/gestionar (ajustar según tu lógica en consola web)
-      allow read, write: if request.auth != null;
+
+    // --- Función de Ayuda ---
+    // Esta función comprueba si el usuario que hace la solicitud
+    // tiene un estado de 'approved' o 'admin' en la colección 'users'.
+    function isApproved() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc.data.status == 'approved' || userDoc.data.status == 'admin';
     }
 
-    // Reglas para síntomas y registros (Acceso general para usuarios autenticados)
-    match /sintomas_globales/{document=**} {
-      allow read, write: if request.auth != null;
+    // --- Regla 1: Colección 'users' ---
+    // Un usuario recién registrado puede crear su propio documento con status 'pending'.
+    // Solo puede leer su propio documento. No puede modificar ni eliminar.
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+      allow update, delete: if false;
     }
-    
-    match /registros_cnd/{document=**} {
-      allow read, write: if request.auth != null;
+
+    // --- Regla 2: Colección 'registros' ---
+    match /registros/{docId} {
+      allow read, write: if isApproved();
     }
-    
-    // Fallback por defecto para colecciones adicionales
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // --- Regla 3: Colección 'equipos' ---
+    match /equipos/{docId} {
+      allow read, write: if isApproved();
+    }
+
+    // --- Regla 4: Colección 'sintomas_globales' ---
+    match /sintomas_globales/{docId} {
+      allow read, write: if isApproved();
     }
   }
 }
