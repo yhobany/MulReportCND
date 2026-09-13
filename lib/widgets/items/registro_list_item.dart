@@ -72,9 +72,9 @@ class RegistroListItem extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(item.status).withOpacity(0.1),
+                    color: _getStatusColor(item.status).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _getStatusColor(item.status).withOpacity(0.2)),
+                    border: Border.all(color: _getStatusColor(item.status).withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

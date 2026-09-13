@@ -43,11 +43,13 @@ class _EditStatusDialogState extends State<EditStatusDialog> {
           const Text("Seleccione el nuevo estatus:"),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _newStatus,
+            initialValue: _newStatus,
             items: _statusEditOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
             onChanged: (val) {
               setState(() {
-                if (val != null) _newStatus = val;
+                if (val != null) {
+                  _newStatus = val;
+                }
               });
             },
             decoration: const InputDecoration(border: OutlineInputBorder()),

@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   AuthMode _authMode = AuthMode.login;
+  bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
 
@@ -35,13 +36,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleSubmit() async {
-    setState(() { _errorMessage = null; _successMessage = null; });
+    setState(() { 
+      _isLoading = true;
+      _errorMessage = null; 
+      _successMessage = null; 
+    });
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() { _errorMessage = "Email y contraseña son obligatorios."; });
+      setState(() { 
+        _isLoading = false;
+        _errorMessage = "Email y contraseña son obligatorios."; 
+      });
       return;
     }
 
@@ -52,20 +60,16 @@ class _LoginScreenState extends State<LoginScreen> {
         await authProvider.signInWithEmailAndPassword(email, password);
       } else {
         await authProvider.createUserWithEmailAndPassword(email, password);
-        // Cerramos la sesión inmediatamente para que no pase automáticamente a la app.
-        await authProvider.signOut();
-        setState(() {
-          _authMode = AuthMode.login;
-          _errorMessage = null;
-          _successMessage = "¡Registro enviado! Tu cuenta está pendiente de aprobación por el administrador.";
-          _passwordController.clear();
-        });
+        // Al crearse la cuenta y registrarse en Firestore con status 'pending',
+        // AuthGate automáticamente dirigirá al usuario a PendingApprovalScreen.
       }
     } catch (e) {
-      setState(() {
-         if (_authMode == AuthMode.login) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (_authMode == AuthMode.login) {
             _errorMessage = "Credenciales inválidas. Verifica tus datos.";
-         } else {
+          } else {
             final errorStr = e.toString();
             if (errorStr.contains('email-already-in-use') || errorStr.contains('already registered')) {
               _errorMessage = "El correo ya está registrado por otro usuario.";
@@ -78,37 +82,39 @@ class _LoginScreenState extends State<LoginScreen> {
             } else {
               _errorMessage = "Error al registrar: $e";
             }
-         }
-      });
+          }
+        });
+      }
     }
   }
 
   Future<void> _handlePasswordReset() async {
-    setState(() { _errorMessage = null; _successMessage = null; });
+    setState(() { 
+      _isLoading = true;
+      _errorMessage = null; 
+      _successMessage = null; 
+    });
 
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      setState(() { _errorMessage = "Ingresa tu correo para restablecer la contraseña."; });
-      return;
-    }
-
-    // Verificamos si el correo existe previamente en la base de datos de usuarios
-    final exists = await _authService.checkUserExistsInFirestore(email);
-    if (!exists) {
-      setState(() {
-        _errorMessage = "No existe ninguna cuenta registrada con este correo electrónico.";
+      setState(() { 
+        _isLoading = false;
+        _errorMessage = "Ingresa tu correo para restablecer la contraseña."; 
       });
       return;
     }
 
     final result = await _authService.sendPasswordResetEmail(email);
 
-    if (result == "success") {
+    if (mounted) {
       setState(() {
-        _successMessage = "Se ha enviado un correo a $email.";
+        _isLoading = false;
+        if (result == "success") {
+          _successMessage = "Se ha enviado un enlace de restablecimiento a $email.";
+        } else {
+          _errorMessage = result;
+        }
       });
-    } else {
-      setState(() { _errorMessage = result; });
     }
   }
 
@@ -141,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
+                      color: primaryColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -164,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     "MulReport CND Management",
                     style: TextStyle(color: AppTheme.textSecondaryColor, fontSize: 16),
                   ),
@@ -178,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         )
@@ -260,19 +266,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         // Botón Principal
                         ElevatedButton(
-                          onPressed: _authMode == AuthMode.passwordReset
-                              ? _handlePasswordReset
-                              : _handleSubmit,
+                          onPressed: _isLoading
+                              ? null
+                              : (_authMode == AuthMode.passwordReset
+                                  ? _handlePasswordReset
+                                  : _handleSubmit),
                           style: ElevatedButton.styleFrom(
                               minimumSize: const Size(double.infinity, 54),
-                              shadowColor: primaryColor.withOpacity(0.4),
+                              shadowColor: primaryColor.withValues(alpha: 0.4),
                               elevation: 4,
                           ),
-                          child: Text(
-                              _authMode == AuthMode.login ? 'Comenzar' :
-                              _authMode == AuthMode.register ? 'Unirse Ahora' :
-                              'Enviar Enlace'
-                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  _authMode == AuthMode.login ? 'Comenzar' :
+                                  _authMode == AuthMode.register ? 'Unirse Ahora' :
+                                  'Enviar Enlace'
+                                ),
                         ),
                       ],
                     ),

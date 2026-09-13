@@ -71,7 +71,7 @@ class MainScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: TabBarView(
+      body: const TabBarView(
         children: [
           RegisterScreen(),
           ReportScreen(),

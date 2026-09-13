@@ -49,8 +49,12 @@ class _EquiposScreenState extends State<EquiposScreen> {
     _debounce?.cancel();
     _utController.dispose();
     _equipoPrincipalController.dispose();
-    for (var controller in _additionalEquipControllers) controller.dispose();
-    for (var node in _additionalEquipFocusNodes) node.dispose();
+    for (var controller in _additionalEquipControllers) {
+      controller.dispose();
+    }
+    for (var node in _additionalEquipFocusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -243,13 +247,21 @@ class _EquiposScreenState extends State<EquiposScreen> {
     // 4. Guardar los que no tienen conflicto (nuevos)
     for (String newEq in newEquipments) {
       bool success = await fileManager.saveEquipmentToCsv(_currentDate, ut, newEq);
-      if (success) savedCount++; else hadErrors = true;
+      if (success) {
+        savedCount++;
+      } else {
+        hadErrors = true;
+      }
     }
     
     // 5. Sobreescribir solo los seleccionados
     for (var record in recordsToOverwrite) {
       bool success = await fileManager.updateEquipment(record, ut, record.equipment, _currentDate);
-      if (success) savedCount++; else hadErrors = true;
+      if (success) {
+        savedCount++;
+      } else {
+        hadErrors = true;
+      }
     }
 
     if (hadErrors) {
@@ -263,8 +275,12 @@ class _EquiposScreenState extends State<EquiposScreen> {
       // Limpiar formulario
       _utController.clear();
       _equipoPrincipalController.clear();
-      for (var controller in _additionalEquipControllers) controller.dispose();
-      for (var node in _additionalEquipFocusNodes) node.dispose();
+      for (var controller in _additionalEquipControllers) {
+        controller.dispose();
+      }
+      for (var node in _additionalEquipFocusNodes) {
+        node.dispose();
+      }
       setState(() { 
         _additionalEquipControllers = []; 
         _additionalEquipFocusNodes = [];

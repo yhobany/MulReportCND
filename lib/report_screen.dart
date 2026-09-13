@@ -1,7 +1,7 @@
 // lib/report_screen.dart
 
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -41,7 +41,7 @@ class _ReportScreenState extends State<ReportScreen> {
   final TextEditingController _utController = TextEditingController();
 
   List<dynamic> _results = [];
-  Set<dynamic> _selectedItems = {};
+  final Set<dynamic> _selectedItems = {};
 
   String _searchType = 'Registros';
   final List<String> _searchOptions = ['Registros', 'Equipos'];
@@ -101,17 +101,17 @@ class _ReportScreenState extends State<ReportScreen> {
   void _showEditStatusDialog(RegistroRecord item) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return EditStatusDialog(
           item: item,
           onSave: (RegistroRecord recordToUpdate, String newStatus, String noteText) async {
             bool success = await fileManager.updateRegistroStatus(recordToUpdate, newStatus, noteText);
 
+            if (!mounted) return;
+
             if (success) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Estatus actualizado a: $newStatus')));
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Estatus actualizado a: $newStatus')));
 
               setState(() {
                 int index = _results.indexOf(recordToUpdate);
@@ -130,10 +130,8 @@ class _ReportScreenState extends State<ReportScreen> {
                 }
               });
             } else {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Error al actualizar estatus')));
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error al actualizar estatus')));
             }
           },
         );
@@ -144,18 +142,18 @@ class _ReportScreenState extends State<ReportScreen> {
   void _showEditEquipmentDialog(EquipmentRecord item) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return EditEquipmentDialog(
           item: item,
           onSave: (EquipmentRecord recordToUpdate, String newUt, String newEquip) async {
             final String newDate = "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
             bool success = await fileManager.updateEquipment(recordToUpdate, newUt, newEquip, newDate);
 
+            if (!mounted) return;
+
             if (success) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Equipo actualizado correctamente')));
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Equipo actualizado correctamente')));
 
               setState(() {
                 int index = _results.indexOf(recordToUpdate);
@@ -170,10 +168,8 @@ class _ReportScreenState extends State<ReportScreen> {
                 }
               });
             } else {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Error al actualizar el equipo')));
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error al actualizar el equipo')));
             }
           },
         );
@@ -204,6 +200,7 @@ class _ReportScreenState extends State<ReportScreen> {
         final list = _selectedItems.cast<EquipmentRecord>().toList();
         success = await fileManager.deleteEquipmentRecords(list);
       }
+      if (!mounted) return;
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eliminados correctamente')));
         _selectedItems.clear();
@@ -240,14 +237,14 @@ class _ReportScreenState extends State<ReportScreen> {
           ..setAttribute("download", fileName)
           ..click();
         html_stub.Url.revokeObjectUrl(url);
-      } catch (e) { print(e); }
+      } catch (e) { debugPrint(e.toString()); }
     } else {
       try {
         final tempDir = await getTemporaryDirectory();
         final File tempFile = File('${tempDir.path}/$fileName');
         await tempFile.writeAsString(csvContent);
         await Share.shareXFiles([XFile(tempFile.path)], text: 'Exportación de Equipos');
-      } catch (e) { print(e); }
+      } catch (e) { debugPrint(e.toString()); }
     }
   }
 
@@ -288,7 +285,7 @@ class _ReportScreenState extends State<ReportScreen> {
                       Navigator.of(context).pop();
                     },
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -339,7 +336,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           Expanded(
                             flex: 2,
                             child: DropdownButtonFormField<String>(
-                              value: _searchType,
+                              initialValue: _searchType,
                               isExpanded: true, // PREVIENE OVERFLOW DE TEXTO LARGO
                               decoration: InputDecoration(
                                 labelText: 'Tipo', // Texto más corto
@@ -359,7 +356,7 @@ class _ReportScreenState extends State<ReportScreen> {
                             Expanded(
                               flex: 2,
                               child: DropdownButtonFormField<String>(
-                                value: _searchPriority,
+                                initialValue: _searchPriority,
                                 isExpanded: true, // PREVIENE OVERFLOW DE TEXTO LARGO
                                 decoration: InputDecoration(
                                   labelText: 'Prioridad',
@@ -393,7 +390,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
                   AnimatedSize(
                     duration: const Duration(milliseconds: 300),
-                    child: Container(
+                    child: SizedBox(
                       height: _areFiltersVisible ? null : 0,
                       child: Column(
                         children: [
@@ -419,7 +416,7 @@ class _ReportScreenState extends State<ReportScreen> {
                               children: [
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
-                                    value: _searchStatus,
+                                    initialValue: _searchStatus,
                                     decoration: const InputDecoration(
                                       labelText: 'Estatus del Registro',
                                       border: OutlineInputBorder(),

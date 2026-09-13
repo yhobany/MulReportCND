@@ -94,6 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (mounted) {
       if (result == 'success') {
         await _loadSymptoms(); // Recargar la lista completa desde Firebase
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Síntoma "$newSympTrim" añadido globalmente')),
         );
@@ -335,7 +336,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   children: [
                     const Text('Prioridad', style: TextStyle(fontWeight: FontWeight.bold)),
                     DropdownButtonFormField<String>(
-                      value: _selectedPriority,
+                      initialValue: _selectedPriority,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 16), // Padding interno reducido

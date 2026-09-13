@@ -38,14 +38,13 @@ class PendingApprovalScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () {
-                  // Al presionar, cerramos la sesión del usuario
-                  // para que vuelva a la pantalla de Login.
-                  AuthService().signOut();
-                },
-                child: const Text('Volver al Inicio de Sesión'),
-              ),
+                ElevatedButton(
+                  onPressed: () async {
+                    // Cerramos la sesión del usuario para que AuthGate vuelva a mostrar el Login
+                    await AuthService().signOut();
+                  },
+                  child: const Text('Volver al Inicio de Sesión'),
+                ),
             ],
           ),
         ),

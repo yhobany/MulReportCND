@@ -4,19 +4,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- Función de Ayuda ---
-    // Esta función comprueba si el usuario que hace la solicitud
-    // tiene un estado de 'approved' o 'admin' en la colección 'users'.
+    // Comprueba de forma segura si el usuario está autenticado y tiene estado 'approved' o 'admin'
     function isApproved() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc.data.status == 'approved' || userDoc.data.status == 'admin';
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved' ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'admin');
     }
 
     // --- Regla 1: Colección 'users' ---
-    // Un usuario recién registrado puede crear su propio documento con status 'pending'.
-    // Solo puede leer su propio documento. No puede modificar ni eliminar.
+    // Un usuario autenticado puede crear y leer su propio documento de perfil.
+    // 'request.auth != null' previene excepciones si el token tarda en propagarse en Web.
     match /users/{userId} {
-      allow read: if request.auth.uid == userId;
-      allow create: if request.auth.uid == userId;
+      allow read, create: if request.auth != null && request.auth.uid == userId;
       allow update, delete: if false;
     }
 
