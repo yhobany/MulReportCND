@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -16,10 +17,15 @@ class DatabaseService {
   Future<bool> saveDataToFile(
       String date, String ut, String point, String description, String priority, String status) async {
     try {
-      await _firestore.collection('registros').add({
+      final docRef = _firestore.collection('registros').doc();
+      await docRef.set({
         'date_string': date, 'timestamp': Timestamp.now(), 'ut': ut, 'point': point,
         'description': description, 'priority': priority, 'status': status, 'actionNote': ''
-      });
+      }).timeout(const Duration(milliseconds: 1200));
+      return true;
+    } on TimeoutException {
+      // Con persistencia offline, el registro ya fue escrito en la base de datos local
+      debugPrint("Registro guardado en caché local offline (timeout de red)");
       return true;
     } catch (e) {
       debugPrint("Error al guardar datos de registro en Firestore: $e");
@@ -116,7 +122,10 @@ class DatabaseService {
       await _firestore.collection('registros').doc(record.id).update({
         'status': newStatus,
         'actionNote': actionNote,
-      });
+      }).timeout(const Duration(milliseconds: 1200));
+      return true;
+    } on TimeoutException {
+      debugPrint("Estado de registro actualizado en caché local (timeout de red)");
       return true;
     } catch (e) {
       debugPrint("Error al actualizar estado del registro en Firestore: $e");
@@ -129,7 +138,10 @@ class DatabaseService {
       final collection = _firestore.collection('registros');
       final batch = _firestore.batch();
       for (var record in recordsToDelete) { if (record.id != null) batch.delete(collection.doc(record.id)); }
-      await batch.commit();
+      await batch.commit().timeout(const Duration(milliseconds: 1200));
+      return true;
+    } on TimeoutException {
+      debugPrint("Registros eliminados en caché local (timeout de red)");
       return true;
     } catch (e) {
       debugPrint("Error al eliminar registros en Firestore: $e");
@@ -147,7 +159,10 @@ class DatabaseService {
         'equipment': newEquipment,
         'date_string': newDate,
         'timestamp': Timestamp.now(), // Actualiza la posición en la lista
-      });
+      }).timeout(const Duration(milliseconds: 1200));
+      return true;
+    } on TimeoutException {
+      debugPrint("Equipo actualizado en caché local (timeout de red)");
       return true;
     } catch (e) {
       debugPrint("Error al actualizar equipo en Firestore: $e");
@@ -167,7 +182,14 @@ class DatabaseService {
         query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay));
       }
       query = query.orderBy('timestamp', descending: true);
-      final snapshot = await query.get();
+      
+      QuerySnapshot snapshot;
+      try {
+        snapshot = await query.get().timeout(const Duration(milliseconds: 1500));
+      } on TimeoutException {
+        snapshot = await query.get(const GetOptions(source: Source.cache));
+      }
+
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final String recordUt = data['ut'] ?? '';
@@ -185,9 +207,13 @@ class DatabaseService {
 
   Future<bool> saveEquipmentToCsv(String date, String ut, String equipment) async {
     try {
-      await _firestore.collection('equipos').add({
+      final docRef = _firestore.collection('equipos').doc();
+      await docRef.set({
         'date_string': date, 'timestamp': Timestamp.now(), 'ut': ut, 'equipment': equipment,
-      });
+      }).timeout(const Duration(milliseconds: 1200));
+      return true;
+    } on TimeoutException {
+      debugPrint("Equipo guardado en caché local (timeout de red)");
       return true;
     } catch (e) {
       debugPrint("Error al guardar equipo en Firestore: $e");
@@ -199,12 +225,20 @@ class DatabaseService {
   Future<List<EquipmentRecord>> getEquipmentByUt(String ut) async {
     final results = <EquipmentRecord>[];
     try {
-      final snapshot = await _firestore.collection('equipos')
-          .where('ut', isEqualTo: ut.toUpperCase())
-          .get();
+      QuerySnapshot snapshot;
+      try {
+        snapshot = await _firestore.collection('equipos')
+            .where('ut', isEqualTo: ut.toUpperCase())
+            .get()
+            .timeout(const Duration(milliseconds: 1500));
+      } on TimeoutException {
+        snapshot = await _firestore.collection('equipos')
+            .where('ut', isEqualTo: ut.toUpperCase())
+            .get(const GetOptions(source: Source.cache));
+      }
 
       for (var doc in snapshot.docs) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         results.add(EquipmentRecord(
           id: doc.id,
           date: data['date_string'] ?? '',
@@ -221,9 +255,14 @@ class DatabaseService {
   Future<List<EquipmentRecord>> readEquipmentRecords() async {
     final results = <EquipmentRecord>[];
     try {
-      final snapshot = await _firestore.collection('equipos').orderBy('timestamp', descending: true).get();
+      QuerySnapshot snapshot;
+      try {
+        snapshot = await _firestore.collection('equipos').orderBy('timestamp', descending: true).get().timeout(const Duration(milliseconds: 1500));
+      } on TimeoutException {
+        snapshot = await _firestore.collection('equipos').orderBy('timestamp', descending: true).get(const GetOptions(source: Source.cache));
+      }
       for (var doc in snapshot.docs) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         results.add(EquipmentRecord(id: doc.id, date: data['date_string'] ?? '', ut: data['ut'] ?? '', equipment: data['equipment'] ?? ''));
       }
     } catch (e) {
@@ -237,7 +276,10 @@ class DatabaseService {
       final collection = _firestore.collection('equipos');
       final batch = _firestore.batch();
       for (var record in recordsToDelete) { if (record.id != null) batch.delete(collection.doc(record.id)); }
-      await batch.commit();
+      await batch.commit().timeout(const Duration(milliseconds: 1200));
+      return true;
+    } on TimeoutException {
+      debugPrint("Equipos eliminados en caché local (timeout de red)");
       return true;
     } catch (e) {
       debugPrint("Error al eliminar equipos de Firestore: $e");

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'auth_gate.dart';
 import 'providers/auth_provider.dart';
 import 'services/database_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/connectivity_banner.dart';
 
 import 'register_screen.dart';
 import 'report_screen.dart';
@@ -15,6 +17,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Configuración explícita de persistencia offline (IndexedDB para Web, SQLite para Android)
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
   runApp(
@@ -27,6 +35,9 @@ Future<void> main() async {
         title: 'Report CND',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        builder: (context, child) => ConnectivityBanner(
+          child: child ?? const SizedBox.shrink(),
+        ),
         home: const AuthGate(),
       ),
     ),

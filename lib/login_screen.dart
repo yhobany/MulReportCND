@@ -68,7 +68,22 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = false;
           if (_authMode == AuthMode.login) {
-            _errorMessage = "Credenciales inválidas. Verifica tus datos.";
+            final errorStr = e.toString();
+            if (errorStr.contains('user-not-found')) {
+              _errorMessage = "No existe ninguna cuenta con este correo.";
+            } else if (errorStr.contains('wrong-password') || errorStr.contains('invalid-credential')) {
+              _errorMessage = "Contraseña o correo incorrectos. Verifica tus datos.";
+            } else if (errorStr.contains('unauthorized-domain')) {
+              _errorMessage = "Dominio no autorizado en Firebase (Authentication > Settings > Authorized Domains).";
+            } else if (errorStr.contains('network-request-failed')) {
+              _errorMessage = "Error de red al conectar con Firebase. Revisa tu conexión a internet.";
+            } else if (errorStr.contains('too-many-requests')) {
+              _errorMessage = "Demasiados intentos fallidos. Inténtalo más tarde.";
+            } else if (errorStr.contains('user-disabled')) {
+              _errorMessage = "Esta cuenta ha sido deshabilitada por el administrador.";
+            } else {
+              _errorMessage = "Error al iniciar sesión: $e";
+            }
           } else {
             final errorStr = e.toString();
             if (errorStr.contains('email-already-in-use') || errorStr.contains('already registered')) {
