@@ -1,0 +1,78 @@
+# Plan de Implementación: Resiliencia Offline y Sincronización (Android & Web)
+
+Implementar persistencia de datos garantizada y retroalimentación visual del estado de red ante cortes de internet para ambas plataformas (Nativo y Web) en una nueva rama de trabajo.
+
+---
+
+## User Review Required
+
+> [!NOTE]
+> Todos los cambios se realizarán en una rama independiente: **`feature/offline-resilience-and-sync`**, manteniendo `main` totalmente protegida.
+
+> [!IMPORTANT]
+> - **Persistencia en Web:** Se activará `persistenceEnabled: true` con `cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED` en Firestore, permitiendo que la versión web use **IndexedDB** para retener los datos localmente si se pierde la conexión o se recarga la página.
+> - **Detección de Conexión:** Se integrará la dependencia oficial `connectivity_plus` para monitorear el estado de red de forma reactiva y multiplataforma.
+> - **Experiencia de Usuario (UI):** Se desplegará un banner sutil y moderno en la parte superior cuando el dispositivo pierda conexión (*"Modo sin conexión • Los registros se sincronizarán al recuperar la señal"*), y confirmación al reconectar.
+
+---
+
+## Proposed Changes
+
+### 1. Gestión de Versiones (Git)
+- Crear y cambiar a la rama: `feature/offline-resilience-and-sync`.
+
+---
+
+### 2. Configuración y Dependencias
+
+#### [MODIFY] [pubspec.yaml](file:///c:/Users/yhoba/MisProyectos/report_cnd/pubspec.yaml)
+- Añadir la dependencia:
+  ```yaml
+  connectivity_plus: ^6.1.0
+  ```
+
+---
+
+### 3. Servicios y Núcleo de la Aplicación
+
+#### [MODIFY] [main.dart](file:///c:/Users/yhoba/MisProyectos/report_cnd/lib/main.dart)
+- Tras `Firebase.initializeApp(...)`, configurar explícitamente los ajustes de persistencia de Firestore:
+  ```dart
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+  ```
+- Integrar el componente `ConnectivityBanner` envolviendo la pantalla principal (`MainScreen`).
+
+---
+
+### 4. Componentes Visuales (UI)
+
+#### [NEW] [connectivity_banner.dart](file:///c:/Users/yhoba/MisProyectos/report_cnd/lib/widgets/connectivity_banner.dart)
+- Crear un widget reactivo que escuche el stream de conectividad de `connectivity_plus`.
+- Mostrar animación fluida (slide/fade):
+  - **Sin internet:** Barra color ámbar/naranja con icono `Icons.wifi_off` y mensaje claro de modo offline.
+  - **Al volver internet:** Notificación breve en verde (*"Conexión restablecida • Sincronizando con Firebase"*) que se oculta automáticamente tras 3 segundos.
+
+---
+
+## Verification Plan
+
+### Automated & Static Tests
+- `flutter pub get`: Resolver e instalar dependencias.
+- `flutter analyze`: Validar 0 errores y advertencias de código.
+- `flutter build apk --debug`: Validar compilación nativa en Android.
+- `flutter build web --release --no-tree-shake-icons`: Validar compilación del paquete Web.
+
+### Manual Verification
+1. **Prueba de Corte de Internet en Android:**
+   - Desactivar WiFi y datos móviles (modo avión).
+   - Verificar que aparece el banner de "Modo sin conexión".
+   - Crear un registro o equipo nuevo y comprobar que se guarda en local con mensaje de éxito.
+   - Reactivar la conexión y comprobar que el banner notifica la reconexión y el registro aparece reflejado en Firebase Console.
+2. **Prueba de Corte de Internet en Web:**
+   - En el navegador (Chrome), ir a DevTools $\rightarrow$ pestaña Network $\rightarrow$ seleccionar "Offline".
+   - Comprobar que el banner se activa de inmediato.
+   - Enviar un registro y comprobar que la app no lanza excepciones no controladas.
+   - Regresar a "Online" y comprobar la sincronización con Firestore.

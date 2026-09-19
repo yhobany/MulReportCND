@@ -1,0 +1,65 @@
+# Resumen de Cambios: Resiliencia Offline y Sincronización
+
+Se han implementado con éxito las mejoras de persistencia y monitoreo de red en la rama independiente **`feature/offline-resilience-and-sync`**.
+
+---
+
+## 1. Cambios Implementados
+
+### Gestión de Versiones (Git)
+* Se creó y activó la rama de trabajo aislada **`feature/offline-resilience-and-sync`**.
+
+### Configuración y Persistencia Multiplataforma
+* **[pubspec.yaml](file:///c:/Users/yhoba/MisProyectos/report_cnd/pubspec.yaml):**
+  * Se agregó la dependencia oficial [connectivity_plus](https://pub.dev/packages/connectivity_plus) (`^6.1.0`).
+* **[main.dart](file:///c:/Users/yhoba/MisProyectos/report_cnd/lib/main.dart):**
+  * Se configuró explícitamente la persistencia en disco de Firestore:
+    ```dart
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+    ```
+    * **En Web:** Activa **IndexedDB** para que los registros se guarden en el almacenamiento local del navegador y no se pierdan si se recarga la pestaña sin internet.
+    * **En Android:** Refuerza la base de datos local SQLite de Firestore.
+  * Se integró el banner globalmente mediante el `builder` de `MaterialApp`, asegurando que cubra todas las pantallas de la app.
+
+### Componente Visual de Conexión
+* **[connectivity_banner.dart](file:///c:/Users/yhoba/MisProyectos/report_cnd/lib/widgets/connectivity_banner.dart):**
+  * Widget reactivo que escucha el stream de cambios de conectividad.
+  * **Modo sin conexión:** Despliega suavemente un banner color ámbar con icono `Icons.wifi_off_rounded` y el mensaje:
+    > *"Modo sin conexión • Los registros se sincronizarán al recuperar la señal"*
+  * **Al restablecerse la conexión:** Cambia brevemente a color verde (*"Conexión restablecida • Sincronizando con Firebase"*) durante 3 segundos y se oculta de forma fluida.
+  * Diseñado con `SafeArea` y elevación para flotar limpiamente sobre cualquier pantalla sin desplazar el contenido inferior.
+
+---
+
+## 2. Resultados de Verificación Técnica
+
+| Prueba | Comando | Resultado |
+| :--- | :--- | :--- |
+| **Análisis estático de código** | `flutter analyze` | **0 errores / 0 advertencias** (4.3s) |
+| **Compilación Web Release** | `flutter build web --release` | **Exitoso** (`√ Built build\web` en 66.8s) |
+| **Compilación Android APK** | `flutter build apk --debug` | **Exitoso** (`√ Built build\app\outputs\flutter-apk\app-debug.apk` en 73.8s) |
+
+---
+
+## 3. Guía para Pruebas Manuales de Corte de Internet
+
+### A. Prueba en Android:
+1. Instala y ejecuta la aplicación en tu dispositivo móvil.
+2. Activa el **Modo Avión** (o desactiva WiFi y Datos Móviles).
+3. **Observa:** El banner ámbar *"Modo sin conexión..."* se deslizará en la parte superior.
+4. Entra a la pestaña **Register** o **Equipos**, crea un nuevo registro y pulsa **Guardar**:
+   * El registro se guardará con éxito en la base de datos local del teléfono.
+5. Desactiva el Modo Avión (recupera internet):
+   * El banner cambiará a verde indicando la reconexión y desaparecerá.
+   * Entra a [Firebase Console](https://console.firebase.google.com/) $\rightarrow$ **Firestore Database** y confirma que el nuevo registro se subió automáticamente a la nube.
+
+### B. Prueba en Web:
+1. Abre la aplicación en Chrome.
+2. Abre las herramientas de desarrollador (`F12` o `Ctrl + Shift + I`) $\rightarrow$ pestaña **Network** (Red).
+3. En el selector de velocidad (por defecto dice *No throttling*), selecciona **Offline**.
+4. **Observa:** El banner ámbar aparecerá de inmediato en la parte superior del navegador.
+5. Guarda un nuevo registro.
+6. En DevTools, vuelve a cambiar a **No throttling** (Online) y comprueba la sincronización con Firestore.
