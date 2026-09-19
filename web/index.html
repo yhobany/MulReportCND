@@ -21,6 +21,20 @@
   <title>MulReport CND</title>
   <link rel="manifest" href="manifest.json">
 
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js')
+          .then(function (reg) {
+            console.log('CND PWA Service Worker registered:', reg.scope);
+          })
+          .catch(function (err) {
+            console.warn('CND PWA Service Worker registration error:', err);
+          });
+      });
+    }
+  </script>
+
   <style>
     body {
       margin: 0;

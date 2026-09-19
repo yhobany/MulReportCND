@@ -3,7 +3,7 @@
 
 // Register Service Worker for PWA offline capabilities
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
+  function registerSW() {
     navigator.serviceWorker.register('sw.js')
       .then(function (registration) {
         console.log('CND PWA Service Worker registered with scope:', registration.scope);
@@ -11,7 +11,13 @@ if ('serviceWorker' in navigator) {
       .catch(function (error) {
         console.warn('CND PWA Service Worker registration failed:', error);
       });
-  });
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    registerSW();
+  } else {
+    window.addEventListener('load', registerSW);
+  }
 }
 
 _flutter.loader.load({
