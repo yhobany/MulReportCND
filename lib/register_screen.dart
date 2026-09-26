@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'services/database_service.dart';
+import 'theme/app_theme.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -374,26 +375,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Botones inferiores: Limpiar (secundario, izquierda) y Guardar (primario, derecha)
-          Wrap(
-            alignment: WrapAlignment.spaceEvenly,
-            spacing: 12.0,
-            runSpacing: 8.0,
+          // Botones inferiores homogéneos: Limpiar (izquierda) y Guardar (derecha)
+          Row(
             children: [
-              OutlinedButton.icon(
-                icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                onPressed: () {
-                  _utController.clear();
-                  _symptomController.clear();
-                  _descriptionController.clear();
-                  setState(() { _selectedPriority = 'Medio'; });
-                },
-                label: const Text('Limpiar'),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade200,
+                    foregroundColor: const Color(0xFF374151),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.cleaning_services_outlined, size: 20),
+                  onPressed: () {
+                    _utController.clear();
+                    _symptomController.clear();
+                    _descriptionController.clear();
+                    setState(() { _selectedPriority = 'Medio'; });
+                  },
+                  label: const Text('Limpiar'),
+                ),
               ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.save_outlined, size: 18),
-                onPressed: _handleSave,
-                label: const Text('Guardar'),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.save_outlined, size: 20),
+                  onPressed: _handleSave,
+                  label: const Text('Guardar'),
+                ),
               ),
             ],
           )
