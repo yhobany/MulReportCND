@@ -369,22 +369,38 @@ class _EquiposScreenState extends State<EquiposScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  flex: 1,
+                  flex: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Fecha', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(4),
-                          color: Colors.grey.shade100,
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
                         ),
-                        child: Text(
-                          _currentDate,
-                          style: const TextStyle(fontSize: 16),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined, size: 18, color: AppTheme.primaryColor),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  _currentDate,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimaryColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -392,7 +408,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -504,30 +520,46 @@ class _EquiposScreenState extends State<EquiposScreen> {
               },
             ),
 
-            Center(
-              child: TextButton.icon(
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
                 onPressed: _addEquipmentField,
-                icon: const Icon(Icons.add),
-                label: const Text('Agregar otro equipo'),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                label: const Text(
+                  'Agregar otro equipo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.accentColor,
+                  side: BorderSide(color: AppTheme.accentColor.withValues(alpha: 0.4), width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  backgroundColor: const Color(0xFFEFF6FF),
                 ),
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: _handleSave,
                 style: ElevatedButton.styleFrom(
-                  elevation: 2,
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text(
-                  'GUARDAR EQUIPOS',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                icon: const Icon(Icons.save_outlined, size: 20),
+                label: const Text(
+                  'Guardar Equipos',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
