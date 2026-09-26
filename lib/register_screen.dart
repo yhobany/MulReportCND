@@ -374,24 +374,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 24),
 
-          // CORREGIDO OVERFLOW AQUÍ: Uso de Wrap para los botones inferiores
+          // Botones inferiores: Limpiar (secundario, izquierda) y Guardar (primario, derecha)
           Wrap(
             alignment: WrapAlignment.spaceEvenly,
-            spacing: 8.0,
+            spacing: 12.0,
             runSpacing: 8.0,
             children: [
-              ElevatedButton(
-                onPressed: _handleSave,
-                child: const Text('Guardar'),
-              ),
-              ElevatedButton(
+              OutlinedButton.icon(
+                icon: const Icon(Icons.cleaning_services_outlined, size: 18),
                 onPressed: () {
                   _utController.clear();
                   _symptomController.clear();
                   _descriptionController.clear();
                   setState(() { _selectedPriority = 'Medio'; });
                 },
-                child: const Text('Limpiar'),
+                label: const Text('Limpiar'),
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.save_outlined, size: 18),
+                onPressed: _handleSave,
+                label: const Text('Guardar'),
               ),
             ],
           )
