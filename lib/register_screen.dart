@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'services/database_service.dart';
+import 'theme/app_theme.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -280,11 +281,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
 
           const Text('Fecha', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Text(
-              _currentDate,
-              style: const TextStyle(fontSize: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 20, color: AppTheme.primaryColor),
+                const SizedBox(width: 12),
+                Text(
+                  _currentDate,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Hoy',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.accentColor,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -374,24 +407,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 24),
 
-          // CORREGIDO OVERFLOW AQUÍ: Uso de Wrap para los botones inferiores
-          Wrap(
-            alignment: WrapAlignment.spaceEvenly,
-            spacing: 8.0,
-            runSpacing: 8.0,
+          // Botones inferiores homogéneos: Limpiar (izquierda) y Guardar (derecha)
+          Row(
             children: [
-              ElevatedButton(
-                onPressed: _handleSave,
-                child: const Text('Guardar'),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade200,
+                    foregroundColor: const Color(0xFF374151),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.cleaning_services_outlined, size: 20),
+                  onPressed: () {
+                    _utController.clear();
+                    _symptomController.clear();
+                    _descriptionController.clear();
+                    setState(() { _selectedPriority = 'Medio'; });
+                  },
+                  label: const Text('Limpiar'),
+                ),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  _utController.clear();
-                  _symptomController.clear();
-                  _descriptionController.clear();
-                  setState(() { _selectedPriority = 'Medio'; });
-                },
-                child: const Text('Limpiar'),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.save_outlined, size: 20),
+                  onPressed: _handleSave,
+                  label: const Text('Guardar'),
+                ),
               ),
             ],
           )

@@ -8,7 +8,7 @@
   "background_color": "#1E3A8A",
   "theme_color": "#1E3A8A",
   "description": "Aplicativo de Inspección y Reportes Técnicos CND",
-  "orientation": "any",
+  "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "categories": [
     "business",

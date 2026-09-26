@@ -193,6 +193,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
     if (confirm) {
       bool success = false;
+      final itemsToDelete = List.from(_selectedItems);
       if (_searchType == 'Registros') {
         final list = _selectedItems.cast<RegistroRecord>().toList();
         success = await fileManager.deleteRegistros(list);
@@ -203,8 +204,11 @@ class _ReportScreenState extends State<ReportScreen> {
       if (!mounted) return;
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eliminados correctamente')));
-        _selectedItems.clear();
-        _performSearch();
+        setState(() {
+          _results.removeWhere((item) => itemsToDelete.contains(item));
+          _selectedItems.clear();
+        });
+        await _performSearch();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al eliminar')));
       }

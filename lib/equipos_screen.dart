@@ -364,68 +364,75 @@ class _EquiposScreenState extends State<EquiposScreen> {
             ),
             const SizedBox(height: 20),
 
-            // --- FILA 1: Fecha y UT ---
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Fecha', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(4),
-                          color: Colors.grey.shade100,
-                        ),
-                        child: Text(
-                          _currentDate,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ],
+            // --- FECHA ---
+            const Text('Fecha', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today_outlined, size: 20, color: AppTheme.primaryColor),
+                  const SizedBox(width: 12),
+                  Text(
+                    _currentDate,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimaryColor,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('UT', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _utController,
-                        decoration: InputDecoration(
-                          hintText: 'Ej: PFM6-123',
-                          border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          suffixIcon: _isCheckingUt 
-                              ? const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                ) 
-                              : null,
-                        ),
-                        onChanged: _onUtChanged,
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Hoy',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.accentColor,
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // --- UT ---
+            const Text('UT', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _utController,
+              decoration: InputDecoration(
+                hintText: 'Ej: PFM6-123',
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                suffixIcon: _isCheckingUt 
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ) 
+                    : null,
+              ),
+              onChanged: _onUtChanged,
             ),
             const SizedBox(height: 24),
 
-            // --- FILA 2: Equipo Principal ---
-            const Text('Equipo Principal', style: TextStyle(fontWeight: FontWeight.bold)),
+            // --- EQUIPO 1 ---
+            const Text('Equipo 1', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -435,7 +442,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                     decoration: const InputDecoration(
                       hintText: 'Nombre o seleccione imagen',
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                     onChanged: (text) {
                       _equipoPrincipalController.value = _equipoPrincipalController.value.copyWith(
@@ -449,54 +456,58 @@ class _EquiposScreenState extends State<EquiposScreen> {
                 IconButton.filledTonal(
                   icon: const Icon(Icons.camera_alt, size: 24),
                   onPressed: () => _handleCamera(null),
-                  tooltip: "Seleccionar imagen", // Tooltip actualizado
+                  tooltip: "Seleccionar imagen",
                 ),
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            // --- EQUIPOS ADICIONALES ---
-            if (_additionalEquipControllers.isNotEmpty) ...[
-              const Text('Equipos Adicionales', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-            ],
-
+            // --- EQUIPOS ADICIONALES (Equipo 2, Equipo 3...) ---
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _additionalEquipControllers.length,
               itemBuilder: (context, index) {
+                final int equipNumber = index + 2;
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: Row(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _additionalEquipControllers[index],
-                          focusNode: _additionalEquipFocusNodes[index],
-                          decoration: InputDecoration(
-                            hintText: 'Ej: Foto-0${index + 2}.jpg',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      Text('Equipo $equipNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _additionalEquipControllers[index],
+                              focusNode: _additionalEquipFocusNodes[index],
+                              decoration: InputDecoration(
+                                hintText: 'Nombre o imagen para Equipo $equipNumber',
+                                border: const OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              ),
+                              onChanged: (text) {
+                                _additionalEquipControllers[index].value = _additionalEquipControllers[index].value.copyWith(
+                                  text: text.toUpperCase(),
+                                  selection: TextSelection.collapsed(offset: text.length),
+                                );
+                              },
+                            ),
                           ),
-                          onChanged: (text) {
-                            _additionalEquipControllers[index].value = _additionalEquipControllers[index].value.copyWith(
-                              text: text.toUpperCase(),
-                              selection: TextSelection.collapsed(offset: text.length),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.camera_alt),
-                        onPressed: () => _handleCamera(index),
-                        tooltip: "Seleccionar imagen",
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, color: AppTheme.statusOpen),
-                        onPressed: () => _removeEquipmentField(index),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            icon: const Icon(Icons.camera_alt),
+                            onPressed: () => _handleCamera(index),
+                            tooltip: "Seleccionar imagen",
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, color: AppTheme.statusOpen),
+                            onPressed: () => _removeEquipmentField(index),
+                            tooltip: "Eliminar Equipo $equipNumber",
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -504,30 +515,46 @@ class _EquiposScreenState extends State<EquiposScreen> {
               },
             ),
 
-            Center(
-              child: TextButton.icon(
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
                 onPressed: _addEquipmentField,
-                icon: const Icon(Icons.add),
-                label: const Text('Agregar otro equipo'),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                label: const Text(
+                  'Agregar otro equipo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.accentColor,
+                  side: BorderSide(color: AppTheme.accentColor.withValues(alpha: 0.4), width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  backgroundColor: const Color(0xFFEFF6FF),
                 ),
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: _handleSave,
                 style: ElevatedButton.styleFrom(
-                  elevation: 2,
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text(
-                  'GUARDAR EQUIPOS',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                icon: const Icon(Icons.save_outlined, size: 20),
+                label: const Text(
+                  'Guardar Equipos',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
