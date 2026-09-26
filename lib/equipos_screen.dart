@@ -431,8 +431,8 @@ class _EquiposScreenState extends State<EquiposScreen> {
             ),
             const SizedBox(height: 24),
 
-            // --- FILA 2: Equipo Principal ---
-            const Text('Equipo Principal', style: TextStyle(fontWeight: FontWeight.bold)),
+            // --- EQUIPO 1 ---
+            const Text('Equipo 1', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -442,7 +442,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                     decoration: const InputDecoration(
                       hintText: 'Nombre o seleccione imagen',
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                     onChanged: (text) {
                       _equipoPrincipalController.value = _equipoPrincipalController.value.copyWith(
@@ -456,54 +456,58 @@ class _EquiposScreenState extends State<EquiposScreen> {
                 IconButton.filledTonal(
                   icon: const Icon(Icons.camera_alt, size: 24),
                   onPressed: () => _handleCamera(null),
-                  tooltip: "Seleccionar imagen", // Tooltip actualizado
+                  tooltip: "Seleccionar imagen",
                 ),
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            // --- EQUIPOS ADICIONALES ---
-            if (_additionalEquipControllers.isNotEmpty) ...[
-              const Text('Equipos Adicionales', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-            ],
-
+            // --- EQUIPOS ADICIONALES (Equipo 2, Equipo 3...) ---
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _additionalEquipControllers.length,
               itemBuilder: (context, index) {
+                final int equipNumber = index + 2;
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: Row(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _additionalEquipControllers[index],
-                          focusNode: _additionalEquipFocusNodes[index],
-                          decoration: InputDecoration(
-                            hintText: 'Ej: Foto-0${index + 2}.jpg',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      Text('Equipo $equipNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _additionalEquipControllers[index],
+                              focusNode: _additionalEquipFocusNodes[index],
+                              decoration: InputDecoration(
+                                hintText: 'Nombre o imagen para Equipo $equipNumber',
+                                border: const OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              ),
+                              onChanged: (text) {
+                                _additionalEquipControllers[index].value = _additionalEquipControllers[index].value.copyWith(
+                                  text: text.toUpperCase(),
+                                  selection: TextSelection.collapsed(offset: text.length),
+                                );
+                              },
+                            ),
                           ),
-                          onChanged: (text) {
-                            _additionalEquipControllers[index].value = _additionalEquipControllers[index].value.copyWith(
-                              text: text.toUpperCase(),
-                              selection: TextSelection.collapsed(offset: text.length),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.camera_alt),
-                        onPressed: () => _handleCamera(index),
-                        tooltip: "Seleccionar imagen",
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, color: AppTheme.statusOpen),
-                        onPressed: () => _removeEquipmentField(index),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            icon: const Icon(Icons.camera_alt),
+                            onPressed: () => _handleCamera(index),
+                            tooltip: "Seleccionar imagen",
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, color: AppTheme.statusOpen),
+                            onPressed: () => _removeEquipmentField(index),
+                            tooltip: "Eliminar Equipo $equipNumber",
+                          ),
+                        ],
                       ),
                     ],
                   ),
